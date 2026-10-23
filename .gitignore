@@ -1,0 +1,66 @@
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python & Django Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Databases & Local State
+*.sqlite3
+*.db
+local_db/
+
+# Media & Uploads (local development)
+media/
+backend/media/
+staticfiles/
+backend/staticfiles/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

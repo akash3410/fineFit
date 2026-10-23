@@ -1,0 +1,14 @@
+# Django Core & API Framework
+Django==5.2.18
+djangorestframework==3.18.3
+
+# PostgreSQL Driver (psycopg 3)
+psycopg[binary]==3.3.6
+
+# Configuration & Security
+django-environ==0.14.0
+django-cors-headers==4.9.0
+
+# Testing
+pytest==8.4.2
+pytest-django==4.14.0
