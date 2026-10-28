@@ -25,6 +25,13 @@ class CustomUserAdmin(UserAdmin):
     search_fields = ("email", "first_name", "last_name", "phone_number")
     ordering = ("email",)
 
+    # ``last_login`` and ``date_joined`` are auto-managed audit timestamps.
+    # Exposing them as editable form fields lets staff clear ``date_joined``
+    # (which has no ``blank=True``) and trigger a confusing
+    # "This field is required" error on save, or corrupt audit data.
+    # Rendering them read-only prevents both problems.
+    readonly_fields = ("last_login", "date_joined")
+
     # Forms for admin change/add without username
     fieldsets = (
         (None, {"fields": ("email", "password")}),
