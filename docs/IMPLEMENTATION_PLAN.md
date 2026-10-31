@@ -15,8 +15,8 @@ To build a robust production foundation rather than a disposable prototype, deve
 - [x] Create Python virtual environment (`.venv`) using Python 3.12.3.
 - [x] Pin and install backend dependencies in `backend/requirements.txt` (Django 5.2.18, DRF 3.18.3, `psycopg[binary]==3.3.6`, `django-cors-headers==4.9.0`, `django-environ==0.14.0`, `pytest==8.4.2`, `pytest-django==4.14.0`).
 - [x] Verify test runner and environment sanity with pytest.
-- [ ] Configure PostgreSQL instance (database: `finefit_db`, user: `finefit_user`) - *Pending host service/container start*.
-- [ ] Install Node.js (v20 or v22 LTS) on the development environment for frontend build tooling.
+- [x] Configure PostgreSQL instance (database available and migrations applied).
+- [x] Install Node.js (v26 LTS available on host; frontend tooling not yet used).
 
 ### Phase 1: Backend Foundation & Authentication (`apps.accounts`)
 - [x] Initialize Django project structure: `backend/config/` and `backend/apps/`.
@@ -25,27 +25,31 @@ To build a robust production foundation rather than a disposable prototype, deve
 - [x] Implement `apps.accounts.managers.CustomUserManager` with validated `create_user` and `create_superuser`.
 - [x] Define `AUTH_USER_MODEL = 'accounts.CustomUser'` in settings.
 - [x] Generate initial migration (`backend/apps/accounts/migrations/0001_initial.py`).
-- [ ] Run database migration `migrate` (*Pending PostgreSQL availability*).
+- [x] Run database migration `migrate` (applied on PostgreSQL).
 - [x] Implement session authentication and CSRF endpoints (`/api/v1/auth/csrf/`, `/api/v1/auth/login/`, `/api/v1/auth/logout/`, `/api/v1/auth/me/`).
 - [x] Write automated tests for user creation, superuser creation, email uniqueness, UUID primary key, and model auth configuration (14 passed).
 
 ### Phase 2: Catalog & Variant Data Architecture (`apps.catalog`)
-- [ ] Implement `Category` model with hierarchical parent-child relationships and slug generators.
-- [ ] Implement `Product` and `ProductVariant` models (supporting size, color, SKU, and price overrides).
-- [ ] Implement `ProductImage` with primary flags, ordering, and variant association.
-- [ ] Configure Django admin with inline variant and image editors.
-- [ ] Create DRF serializers: `CategorySerializer`, `ProductListSerializer`, `ProductDetailSerializer` (optimized querysets using `prefetch_related`).
-- [ ] Implement public catalog endpoints:
+- [x] Implement `Category` model with hierarchical parent-child relationships and slug generators.
+- [x] Implement `Product` and `ProductVariant` models (supporting size, color, SKU, and price overrides).
+- [x] Implement `ProductImage` with primary flags, ordering, and variant association.
+- [x] Configure Django admin with inline variant and image editors.
+- [x] Create DRF serializers: `CategorySerializer`, `ProductListSerializer`, `ProductDetailSerializer` (optimized querysets using `prefetch_related`).
+- [x] Implement public catalog endpoints:
   - `GET /api/v1/catalog/categories/`
   - `GET /api/v1/catalog/products/` (filtering by category, size, color, price)
   - `GET /api/v1/catalog/products/{slug}/`
-- [ ] Write automated unit/integration tests for catalog query performance and filtering.
+- [x] Write automated unit/integration tests for catalog query performance and filtering.
 
 ### Phase 3: Inventory Management & Atomic Concurrency (`apps.inventory`)
-- [ ] Implement `StockRecord` model with foreign key to `ProductVariant`.
-- [ ] Create `StockService` providing atomic check, reserve, and decrement operations using `select_for_update()`.
-- [ ] Implement inventory alert signals for low-stock thresholds.
-- [ ] Write concurrency tests verifying that simultaneous checkout attempts do not oversell remaining stock.
+- [x] Implement `StockRecord` model with `OneToOneField` to `ProductVariant`, `quantity_on_hand`, `quantity_reserved`, `available_quantity` derived property, `low_stock_threshold`, and database check constraints.
+- [x] Implement `StockMovement` immutable audit model with deltas, reasons, reference ID, and actor.
+- [x] Create `StockService` providing atomic check, increase, decrease, reserve, release, and set operations using `select_for_update()`.
+- [x] Implement batch-locking with deterministic ID sorting to prevent PostgreSQL lock acquisition deadlocks.
+- [x] Implement permission-gated staff API endpoints (`/api/v1/inventory/records/`, `/api/v1/inventory/movements/`) requiring explicit model permissions.
+- [x] Implement public derived availability endpoint (`/api/v1/inventory/availability/<variant_id>/`) and integrate derived stock status into public catalog serializer.
+- [x] Implement development-only `seed_demo_inventory` management command (refuses production/DEBUG=False; unexecuted on dev database).
+- [x] Write PostgreSQL-backed unit, API, rollback, and concurrency tests (52 tests passed; 174 total across project).
 
 ### Phase 4: Shopping Cart & Guest Checkout (`apps.cart` & `apps.orders`)
 - [ ] Implement `Cart` and `CartItem` models supporting both authenticated users and guest sessions.

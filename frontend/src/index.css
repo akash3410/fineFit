@@ -1,0 +1,337 @@
+/* Google Fonts must be imported before Tailwind to comply with CSS @import ordering */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* ── Tailwind v4 theme extensions ── */
+@theme {
+  --font-serif: 'Cormorant Garamond', 'Georgia', serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Base styles ── */
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Slide-out menu panel ── */
+.menu-panel-enter {
+  transform: translateX(100%);
+}
+.menu-panel-active {
+  transform: translateX(0);
+  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.menu-panel-exit {
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* ── Backdrop blur animation ── */
+.backdrop-enter {
+  opacity: 0;
+}
+.backdrop-active {
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+.backdrop-exit {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+/* ── Hero photograph crops ──
+ * Crop control comes from per-campaign custom properties set by FashionSlide,
+ * so a photograph can protect its subject from the crop on mobile and desktop
+ * independently without loading two <img> elements. The particle sampler reads
+ * the same value, so the snow starts exactly where those pixels were.
+ */
+.hero-campaign-image {
+  object-position: var(--hero-pos-mobile, center);
+}
+
+@media (min-width: 768px) {
+  .hero-campaign-image {
+    object-position: var(--hero-pos-desktop, center);
+  }
+}
+
+/* ── Hero text reveal animation ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-fade-in-up-delay {
+  animation: fadeInUp 0.8s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
+.animate-fade-in-up-delay-2 {
+  animation: fadeInUp 0.8s ease-out 0.4s forwards;
+  opacity: 0;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Brand Promise Slider
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* Section surface: clean, transparent stage. */
+.brand-promise-slider {
+  background: transparent;
+  overflow-x: hidden;
+}
+
+/* ── Editorial heading ── */
+.brand-promise-slider__head {
+  margin-bottom: 1rem;
+}
+
+.brand-promise-slider__title {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 400;
+  line-height: 1.1;
+  color: #1c1917;
+  margin: 0 0 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.brand-promise-slider__subtitle {
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+  line-height: 1.6;
+  color: rgba(13, 73, 102, 0.7);
+  margin: 0 auto;
+  max-width: 44rem;
+}
+
+/* ── Slider viewport ── */
+.brand-promise-slider__viewport {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-x;
+}
+
+/* Track holds the absolutely-positioned coverflow cards. Perspective lives
+ * here so every card shares one 3-D camera. Cards are centred via left: 50% /
+ * top: 50% and offset with translateX by their relative position. */
+.brand-promise-slider__track {
+  position: relative;
+  height: clamp(400px, 60vh, 700px);
+  transform-style: preserve-3d;
+  perspective: 1200px;
+}
+
+/* ── 3-D journey card ── */
+.brand-promise-card {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: auto;
+  will-change: transform, opacity;
+}
+
+/* Visible side wall: card thickness for 3-D depth. */
+.brand-promise-card__wall {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 1.5rem;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Registered custom property so the conic-gradient's start angle can be
+ * animated smoothly instead of rotating the element itself. This keeps the
+ * beam travelling along the rounded-rect perimeter while the element (and the
+ * card) stay perfectly still. */
+@property --beam-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Rotating light beam around center card perimeter. The element is masked
+ * down to a thin rounded-rect ring; the gradient angle sweeps clockwise so a
+ * champagne-gold head with a soft trailing fade glides around all four sides
+ * and corners. Gold (the brand accent) instead of ivory: a near-white beam is
+ * invisible against the white card on the light page. */
+.brand-promise-card__beam {
+  position: absolute;
+  inset: 0;
+  border-radius: 1.5rem;
+  padding: 2px;
+  pointer-events: none;
+  overflow: hidden;
+/* Stops must be monotonically increasing around the circle — the tail wraps
+ * back to the same transparent color as the head start, which is what makes
+ * the loop seamless. Clamped non-monotonic stops would collapse the gradient. */
+  background: conic-gradient(
+    from var(--beam-angle),
+    rgba(185, 154, 107, 0) 0deg,
+    rgba(205, 175, 125, 0.28) 8deg,
+    rgba(205, 175, 125, 0.7) 16deg,
+    rgba(222, 196, 146, 0.95) 24deg,
+    rgba(185, 154, 107, 0.5) 36deg,
+    rgba(185, 154, 107, 0.12) 50deg,
+    rgba(185, 154, 107, 0) 62deg,
+    rgba(185, 154, 107, 0) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) border-box,
+    linear-gradient(#fff 0 0) content-box;
+  -webkit-mask-composite: destination-out;
+          mask:
+    linear-gradient(#fff 0 0) border-box,
+    linear-gradient(#fff 0 0) content-box;
+          mask-composite: exclude;
+  /* Subtle warm glow hugging the moving ring — soft, not neon. */
+  filter:
+    drop-shadow(0 0 5px rgba(185, 154, 107, 0.55))
+    drop-shadow(0 0 14px rgba(185, 154, 107, 0.3));
+  animation: rotateBeam 4s linear infinite;
+  z-index: 0;
+}
+
+@keyframes rotateBeam {
+  from {
+    --beam-angle: 0deg;
+  }
+  to {
+    --beam-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-promise-card__beam {
+    animation: none;
+    display: none;
+  }
+}
+
+/* Readable card surface. */
+.brand-promise-card__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1.6rem 1.25rem;
+  border-radius: 1.5rem;
+  border: none;
+  box-shadow: 0 12px 32px -6px rgba(13, 73, 102, 0.15);
+  background: transparent;
+  min-height: 200px;
+}
+
+/* Stage number — small, letterspaced, warm accent. */
+.brand-promise-card__number {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #0D4966;
+  transition: color 0.4s ease;
+}
+
+/* Stage title. */
+.brand-promise-card__title {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  letter-spacing: -0.01em;
+  color: #0D4966;
+  margin: 0;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+/* Stage description. */
+.brand-promise-card__desc {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: #1c1917;
+  max-width: 26ch;
+  margin: 0 auto;
+  opacity: 0.9;
+}
+
+/* ── Controls ── */
+.brand-promise-slider__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1rem;
+}
+
+.brand-promise-slider__dots {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.brand-promise-slider__dots button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  border: none;
+  background: rgba(13, 73, 102, 0.35);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.3s ease;
+}
+
+.brand-promise-slider__dots button[aria-current="true"] {
+  background: #0D4966;
+  width: 0.75rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1023px) {
+  .brand-promise-slider__head {
+    margin-bottom: 1rem;
+  }
+
+  .brand-promise-slider__viewport {
+    margin: 0 -1rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .brand-promise-slider__title {
+    font-size: clamp(1.75rem, 6vw, 2.5rem);
+  }
+
+  .brand-promise-slider__viewport {
+    margin: 0 -0.75rem;
+  }
+}
+
+/* Reduced motion: disable automatic movement. */
+@media (prefers-reduced-motion: reduce) {
+  .brand-promise-card {
+    transition: none;
+  }
+}

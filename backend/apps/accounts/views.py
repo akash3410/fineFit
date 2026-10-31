@@ -2,11 +2,15 @@ from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
+import logging
+
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import UserSerializer
+
+logger = logging.getLogger(__name__)
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -65,9 +69,44 @@ class SessionLoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        # ADR-005 / ADR-010 (Option B): capture the guest session key BEFORE
+        # ``login()`` — Django rotates the session key on login for
+        # session-fixation protection, and the guest cart is keyed by the
+        # pre-login session key. Merge happens only after successful
+        # authentication, inside a transaction, and never on failure.
+        guest_session_key = request.session.session_key
+
         login(request, user)
+
+        merge_result = None
+        if guest_session_key:
+            try:
+                from apps.cart.services import CartService
+
+                # Deferred import avoids a hard coupling between accounts and
+                # the cart domain (works even if apps.cart is unavailable).
+                user_cart, conflicts = CartService.merge_guest_cart_into_user_cart(
+                    guest_session_key=guest_session_key,
+                    user=user,
+                )
+                merge_result = {
+                    "cart_id": str(user_cart.id),
+                    "total_quantity": user_cart.total_quantity,
+                    "conflicts": conflicts,
+                }
+            except Exception as exc:  # noqa: BLE001
+                # A merge failure must never block or roll back a successful
+                # login, and must never destroy the guest cart (the merge
+                # transaction rolled back, so the guest cart is intact).
+                logger.warning(
+                    "Guest cart merge failed after successful login: %s", exc
+                )
+
         serializer = UserSerializer(user)
-        return Response(serializer.data)
+        response_data = serializer.data
+        if merge_result is not None:
+            response_data = {**serializer.data, "cart_merge": merge_result}
+        return Response(response_data)
 
 
 class SessionLogoutView(APIView):

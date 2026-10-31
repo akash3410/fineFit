@@ -87,7 +87,7 @@ graph TD
   - `id`: BigAutoField
   - `product`: `ForeignKey(Product, related_name='images')`
   - `variant`: `ForeignKey('ProductVariant', null=True, blank=True, related_name='images')`
-  - `image`: `ImageField(upload_to='products/%Y/%m/')`
+  - `image`: `ImageField(upload_to=product_image_upload_path)` -> `catalog/products/<product_uuid>/<uuid_hex><ext>`
   - `alt_text`: `CharField`
   - `is_primary`: `BooleanField(default=False)`
   - `display_order`: `PositiveIntegerField(default=0)`
@@ -105,9 +105,25 @@ graph TD
 - **`StockRecord`**:
   - `id`: BigAutoField
   - `variant`: `OneToOneField(ProductVariant, related_name='stock_record')`
-  - `quantity`: `PositiveIntegerField(default=0)`
+  - `quantity_on_hand`: `PositiveIntegerField(default=0)` (physical stock)
+  - `quantity_reserved`: `PositiveIntegerField(default=0)` (allocated stock)
+  - `available_quantity`: Derived property (`max(0, quantity_on_hand - quantity_reserved)`)
   - `low_stock_threshold`: `PositiveIntegerField(default=5)`
+  - `created_at`: `DateTimeField(auto_now_add=True)`
   - `updated_at`: `DateTimeField(auto_now=True)`
+  - *Constraints*: `quantity_on_hand >= 0`, `quantity_reserved >= 0`, `quantity_reserved <= quantity_on_hand`, `low_stock_threshold >= 0`
+- **`StockMovement`**:
+  - `id`: BigAutoField
+  - `stock_record`: `ForeignKey(StockRecord, related_name='movements', on_delete=models.PROTECT)`
+  - `variant`: `ForeignKey(ProductVariant, related_name='stock_movements', on_delete=models.PROTECT)`
+  - `quantity_delta`: `IntegerField(default=0)` (signed on-hand delta)
+  - `reserved_delta`: `IntegerField(default=0)` (signed reserved delta)
+  - `reason`: `CharField(choices=MovementReason.choices)`
+  - `notes`: `TextField(blank=True)`
+  - `reference_id`: `CharField(max_length=128, blank=True)`
+  - `actor`: `ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL)`
+  - `created_at`: `DateTimeField(auto_now_add=True, db_index=True)`
+  - *Audit Protection*: Immutable log (updates and deletions raise `ValidationError`).
 
 ### 2.4 Shopping Cart (`apps.cart`)
 - **`Cart`**:
@@ -203,6 +219,15 @@ def process_order_checkout(cart, checkout_data):
 - `GET /api/v1/catalog/categories/` - Category tree hierarchy
 - `GET /api/v1/catalog/products/` - Filtered list (category, size, color, price range, search)
 - `GET /api/v1/catalog/products/{slug}/` - Detailed product view with all variants, images, and live stock flags
+
+### Inventory (`/api/v1/inventory/`)
+- `GET /api/v1/inventory/availability/{variant_id}/` - Public derived availability (`IN_STOCK`, `LOW_STOCK`, `OUT_OF_STOCK`; no raw counts leaked)
+- `GET /api/v1/inventory/records/` - Staff stock list with filters (`low_stock`, `out_of_stock`, `sku`, `search`)
+- `GET /api/v1/inventory/records/{variant_id}/` - Staff stock record detail
+- `POST /api/v1/inventory/records/` - Staff create new variant stock record
+- `POST /api/v1/inventory/records/{variant_id}/adjust/` - Staff transactional stock adjustment (`INCREASE`, `DECREASE`, `SET`, `RESERVE`, `RELEASE`)
+- `GET /api/v1/inventory/movements/` - Staff immutable audit movement log list (filtered by `variant_id`, `reason`)
+- `GET /api/v1/inventory/movements/{id}/` - Staff audit movement log detail
 
 ### Cart
 - `GET /api/v1/cart/` - Retrieve active cart (authenticated or session guest)

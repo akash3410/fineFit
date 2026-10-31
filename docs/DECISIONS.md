@@ -97,6 +97,21 @@ This document records the rationale behind key technical choices, trade-offs eva
 
 ---
 
+### ADR-010: Decoupled Inventory Reservation Architecture & Unresolved Policy
+- **Status**: Accepted
+- **Context**: Retail fashion platforms must manage high contention during sales drops. However, the client has not finalized whether stock should be reserved upon adding an item to the shopping cart (with expiration) or only upon final checkout submission.
+- **Decision**: Architect `apps.inventory` and `StockService` with generic, reusable primitive operations:
+  1. `reserve_stock(variant, quantity, ...)`: Increments `quantity_reserved` and decrements derived `available_quantity` while preserving on-hand stock.
+  2. `release_reservation(variant, quantity, ...)`: Decrements `quantity_reserved` and restores `available_quantity`.
+  3. `decrease_stock(..., from_reserved=True/False)`: Supports fulfillment whether items were pre-reserved or directly decremented at checkout.
+  4. Multi-variant lock sorting: Enforces deterministic UUID order when calling `select_for_update()` to prevent PostgreSQL deadlocks.
+  Do not couple reservation mechanics to Cart or Checkout until the client decides between Option A and Option B.
+- **Consequences**:
+  - *Positive*: Full flexibility to adopt either cart-reservation or checkout-only reservation without altering the inventory core or database schema. Zero business assumptions hardcoded.
+  - *Trade-off*: Both workflows must be maintained and verified in unit tests.
+
+---
+
 ## 2. Unresolved Business Decisions (Client Clarification Needed)
 
 The following items are documented as open decisions and must not be assumed without client/stakeholder agreement:

@@ -12,3 +12,6 @@ django-cors-headers==4.9.0
 # Testing
 pytest==8.4.2
 pytest-django==4.14.0
+
+# Image handling (required by Django ImageField for product images)
+Pillow==11.3.0

@@ -11,6 +11,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # Versioned API routes
     path("api/v1/auth/", include("apps.accounts.urls")),
+    path("api/v1/catalog/", include("apps.catalog.urls")),
+    path("api/v1/inventory/", include("apps.inventory.urls")),
+    path("api/v1/cart/", include("apps.cart.urls")),
 ]
 
 if settings.DEBUG:

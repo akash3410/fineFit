@@ -50,6 +50,9 @@ INSTALLED_APPS = [
 
     # Domain modular applications
     "apps.accounts.apps.AccountsConfig",
+    "apps.catalog.apps.CatalogConfig",
+    "apps.inventory.apps.InventoryConfig",
+    "apps.cart.apps.CartConfig",
 ]
 
 MIDDLEWARE = [
