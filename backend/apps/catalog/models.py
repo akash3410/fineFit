@@ -23,6 +23,7 @@ import uuid
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 # ---------------------------------------------------------------------------
@@ -55,7 +56,10 @@ class CategoryQuerySet(models.QuerySet):
     """Queryset helpers for the category tree."""
 
     def active(self):
-        return self.filter(is_active=True)
+        return self.filter(is_active=True, is_deleted=False)
+
+    def soft_deleted(self):
+        return self.filter(is_deleted=True)
 
 
 class Category(models.Model):
@@ -73,6 +77,23 @@ class Category(models.Model):
         unique=True,
         help_text=_("Globally unique URL identifier for this category."),
     )
+    description = models.TextField(_("description"), blank=True)
+    is_active = models.BooleanField(
+        _("active"),
+        default=True,
+        help_text=_("Inactive categories are hidden from the public storefront."),
+    )
+    is_deleted = models.BooleanField(
+        _("deleted"),
+        default=False,
+        help_text=_("Soft-deleting preserves the record for future order history."),
+    )
+    deleted_at = models.DateTimeField(
+        _("deleted at"),
+        null=True,
+        blank=True,
+        help_text=_("Timestamp when the category was soft-deleted."),
+    )
     parent = models.ForeignKey(
         "self",
         verbose_name=_("parent category"),
@@ -81,11 +102,6 @@ class Category(models.Model):
         null=True,
         blank=True,
         help_text=_("Optional parent category; empty for a top-level category."),
-    )
-    is_active = models.BooleanField(
-        _("active"),
-        default=True,
-        help_text=_("Inactive categories are hidden from the public storefront."),
     )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
@@ -137,13 +153,121 @@ class Category(models.Model):
                         {"parent": _("A category cannot be moved under one of its own descendants.")}
                     )
 
+    def soft_delete(self):
+        """Mark the category as deleted without physically removing it."""
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
+    def restore(self):
+        """Restore a soft-deleted category."""
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
+
+class SubcategoryQuerySet(models.QuerySet):
+    """Queryset helpers for the subcategory collection."""
+
+    def active(self):
+        return self.filter(is_active=True, is_deleted=False)
+
+    def soft_deleted(self):
+        return self.filter(is_deleted=True)
+
+
+class Subcategory(models.Model):
+    """
+    A second-level classification under a top-level ``Category``.
+
+    Each subcategory belongs to exactly one parent category and contains its own
+    slug, guaranteed unique within parent via a database constraint.
+    """
+
+    category = models.ForeignKey(
+        Category,
+        verbose_name=_("parent category"),
+        on_delete=models.PROTECT,
+        related_name="subcategories",
+        help_text=_("Top-level category this subcategory belongs to."),
+    )
+    name = models.CharField(_("name"), max_length=150)
+    slug = models.SlugField(
+        _("slug"),
+        max_length=160,
+        help_text=_("URL identifier, unique within the parent category."),
+    )
+    description = models.TextField(_("description"), blank=True)
+    is_active = models.BooleanField(
+        _("active"),
+        default=True,
+        help_text=_("Inactive subcategories are hidden from the public storefront."),
+    )
+    is_deleted = models.BooleanField(
+        _("deleted"),
+        default=False,
+        help_text=_("Soft-deleting preserves the record for historical reference."),
+    )
+    deleted_at = models.DateTimeField(
+        _("deleted at"),
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    objects = SubcategoryQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _("subcategory")
+        verbose_name_plural = _("subcategories")
+        ordering = ["category__name", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["category", "name"],
+                name="unique_subcategory_name_per_category",
+            ),
+            models.UniqueConstraint(
+                fields=["category", "slug"],
+                name="unique_subcategory_slug_per_category",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self):
+        super().clean()
+        if self.is_deleted:
+            raise ValidationError({"is_deleted": _("A deleted subcategory cannot be edited.")})
+        if self.pk and self.category_id and self.category.is_deleted:
+            raise ValidationError({"category": _("Cannot add a subcategory to a deleted category.")})
+
+    def soft_delete(self):
+        """Mark the subcategory as deleted without physically removing it."""
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
+    def restore(self):
+        """Restore a soft-deleted subcategory."""
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
 
 class ProductQuerySet(models.QuerySet):
     """Queryset helpers enforcing the public visibility rules."""
 
+    def active(self):
+        return self.filter(is_deleted=False)
+
     def published(self):
         """Products that are publicly visible (published under an active category)."""
-        return self.filter(is_published=True, category__is_active=True)
+        return self.filter(is_published=True, category__is_active=True, is_deleted=False)
+
+    def soft_deleted(self):
+        return self.filter(is_deleted=True)
 
 
 class Product(models.Model):
@@ -167,6 +291,15 @@ class Product(models.Model):
         on_delete=models.PROTECT,
         related_name="products",
     )
+    subcategory = models.ForeignKey(
+        Subcategory,
+        verbose_name=_("subcategory"),
+        on_delete=models.PROTECT,
+        related_name="products",
+        null=True,
+        blank=True,
+        help_text=_("Optional subcategory this product belongs to."),
+    )
     title = models.CharField(_("title"), max_length=255)
     slug = models.SlugField(
         _("slug"),
@@ -174,18 +307,61 @@ class Product(models.Model):
         unique=True,
         help_text=_("Globally unique URL identifier for this product."),
     )
+    sku = models.CharField(
+        _("SKU"),
+        max_length=64,
+        unique=False,
+        blank=True,
+        null=True,
+        help_text=_("Stock keeping unit; unique across the entire catalog."),
+    )
     description = models.TextField(_("description"), blank=True)
-    base_price = models.DecimalField(
-        _("base price"),
+    price = models.DecimalField(
+        _("price"),
         max_digits=10,
         decimal_places=2,
+        default=0,
         validators=[MinValueValidator(0)],
         help_text=_("Base retail price; a variant may override this."),
+    )
+    discount_price = models.DecimalField(
+        _("discount price"),
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text=_("Optional discounted price; must be less than price."),
+    )
+    stock = models.PositiveIntegerField(
+        _("stock"),
+        default=0,
+        help_text=_("Total available stock quantity (aggregated from variants if applicable)."),
+    )
+    status = models.BooleanField(
+        _("active"),
+        default=True,
+        help_text=_("Active products are visible on the storefront."),
     )
     is_published = models.BooleanField(
         _("published"),
         default=False,
         help_text=_("Draft (unpublished) products are never exposed publicly."),
+    )
+    is_featured = models.BooleanField(
+        _("featured"),
+        default=False,
+        help_text=_("Featured products are highlighted on the storefront."),
+    )
+    is_deleted = models.BooleanField(
+        _("deleted"),
+        default=False,
+        help_text=_("Soft-deleting preserves the record for future order history."),
+    )
+    deleted_at = models.DateTimeField(
+        _("deleted at"),
+        null=True,
+        blank=True,
     )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
@@ -202,27 +378,75 @@ class Product(models.Model):
                 name="product_pub_created_idx",
             ),
             models.Index(
-                fields=["is_published", "base_price"],
+                fields=["is_published", "price"],
                 name="product_pub_price_idx",
+            ),
+            models.Index(
+                fields=["status", "is_deleted"],
+                name="product_status_deleted_idx",
             ),
         ]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(base_price__gte=0),
-                name="product_base_price_non_negative",
+                condition=models.Q(price__gte=0),
+                name="product_price_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(discount_price__isnull=True)
+                | models.Q(discount_price__lt=models.F("price")),
+                name="product_discount_price_lt_price",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(stock__gte=0),
+                name="product_stock_non_negative",
             ),
         ]
 
     def __str__(self) -> str:
         return self.title
 
+    @property
+    def name(self) -> str:
+        """Alias for title to match plan terminology."""
+        return self.title
+
+    @property
+    def is_active(self) -> bool:
+        """Check if product is active (status True and not deleted)."""
+        return self.status and not self.is_deleted
+
+    def clean(self):
+        super().clean()
+        if self.is_deleted:
+            raise ValidationError({"is_deleted": _("A deleted product cannot be edited.")})
+        if self.subcategory_id and self.category_id:
+            if self.subcategory.category_id != self.category_id:
+                raise ValidationError(
+                    {"subcategory": _("The selected subcategory must belong to the selected category.")}
+                )
+        if self.discount_price is not None and self.discount_price >= self.price:
+            raise ValidationError(
+                {"discount_price": _("Discount price must be less than the regular price.")}
+            )
+
+    def soft_delete(self):
+        """Mark the product as deleted without physically removing it."""
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
+    def restore(self):
+        """Restore a soft-deleted product."""
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
 
 class ProductVariant(models.Model):
     """
     A specific size/colour combination of a product, identified by a unique SKU.
 
-    Inventory boundary: NO stock quantity lives here. Stock is managed by
-    ``apps.inventory.StockRecord`` (one-to-one via ``variant.stock_record``).
+    Stock is tracked directly on variants for admin management convenience.
     """
 
     id = models.UUIDField(
@@ -271,6 +495,11 @@ class ProductVariant(models.Model):
         validators=[MinValueValidator(0)],
         help_text=_("Optional variant-specific price; falls back to the product base price."),
     )
+    stock = models.PositiveIntegerField(
+        _("stock"),
+        default=0,
+        help_text=_("Available stock quantity for this variant."),
+    )
     is_active = models.BooleanField(
         _("active"),
         default=True,
@@ -295,6 +524,10 @@ class ProductVariant(models.Model):
                 | models.Q(price_override__gte=0),
                 name="variant_price_override_non_negative",
             ),
+            models.CheckConstraint(
+                condition=models.Q(stock__gte=0),
+                name="variant_stock_non_negative",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -310,7 +543,7 @@ class ProductVariant(models.Model):
         """Variant price: the override if set, otherwise the product base price."""
         if self.price_override is not None:
             return self.price_override
-        return self.product.base_price if self.product_id else None
+        return self.product.price if self.product_id else None
 
     def clean(self):
         super().clean()
@@ -384,6 +617,11 @@ class ProductImage(models.Model):
         default=False,
         help_text=_("The single primary image shown on list/detail views."),
     )
+    is_main = models.BooleanField(
+        _("main image"),
+        default=False,
+        help_text=_("The main/primary image for product display."),
+    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
@@ -400,7 +638,7 @@ class ProductImage(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"Image for {self.product_id} ({'primary' if self.is_primary else 'secondary'})"
+        return f"Image for {self.product_id} ({'primary' if self.is_primary or self.is_main else 'secondary'})"
 
     def clean(self):
         super().clean()
@@ -411,3 +649,8 @@ class ProductImage(models.Model):
                 raise ValidationError(
                     {"variant": _("The selected variant does not belong to this product.")}
                 )
+        # Sync is_main with is_primary for backward compatibility
+        if self.is_main and not self.is_primary:
+            self.is_primary = True
+        elif self.is_primary and not self.is_main:
+            self.is_main = True

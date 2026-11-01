@@ -1,0 +1,52 @@
+<nav id="sidebar" class="bg-dark text-white position-fixed">
+    <div class="p-3 border-bottom border-secondary">
+        <h5 class="mb-0">FineFit Admin</h5>
+    </div>
+    <ul class="nav flex-column">
+        <li class="nav-item">
+            <a class="nav-link text-white {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'custom_dashboard' %}active{% endif %}" href="/admin/custom-dashboard/">
+                <i class="bi bi-speedometer2 me-2"></i> Dashboard
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link text-white {% if 'category' in request.path %}active{% endif %}" href="/admin/categories/">
+                <i class="bi bi-folder me-2"></i> Categories
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link text-white {% if 'subcategory' in request.path %}active{% endif %}" href="/admin/subcategories/">
+                <i class="bi bi-diagram-2 me-2"></i> Subcategories
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link text-white {% if 'product' in request.path %}active{% endif %}" href="/admin/products/">
+                <i class="bi bi-box-seam me-2"></i> Products
+            </a>
+        </li>
+        {% if request.user.is_superuser %}
+        <li class="nav-item mt-3">
+            <span class="nav-link text-white small text-uppercase">User Management</span>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link text-white {% if 'admins' in request.path %}active{% endif %}" href="/admin/admins/">
+                <i class="bi bi-people me-2"></i> Admin Users
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link text-white {% if 'roles' in request.path %}active{% endif %}" href="/admin/roles/">
+                <i class="bi bi-person-badge me-2"></i> Roles
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link text-white {% if 'permissions' in request.path %}active{% endif %}" href="/admin/permissions/">
+                <i class="bi bi-shield-lock me-2"></i> Permissions
+            </a>
+        </li>
+        {% endif %}
+        <li class="nav-item mt-3">
+            <a class="nav-link text-white" href="/admin/">
+                <i class="bi bi-gear me-2"></i> Django Admin
+            </a>
+        </li>
+    </ul>
+</nav>

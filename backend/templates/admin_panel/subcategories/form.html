@@ -1,0 +1,48 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}{{ action }} Subcategory - FineFit Admin{% endblock %}
+{% block page_title %}{{ action }} Subcategory{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">{{ action }} Subcategory</h5>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">Name <span class="text-danger">*</span></label>
+                <input type="text" name="name" class="form-control" value="{{ subcategory.name|default:'' }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Parent Category <span class="text-danger">*</span></label>
+                <select name="category" class="form-select" required>
+                    <option value="">Select Category</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if subcategory.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Slug</label>
+                <input type="text" name="slug" class="form-control" value="{{ subcategory.slug|default:'' }}" placeholder="Auto-generated if empty">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-control" rows="3">{{ subcategory.description|default:'' }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="active" {% if subcategory.is_active or not subcategory %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if subcategory and not subcategory.is_active %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a href="/admin/subcategories/" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

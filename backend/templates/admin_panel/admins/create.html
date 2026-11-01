@@ -1,0 +1,71 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Add Admin User - FineFit Admin{% endblock %}
+{% block page_title %}Add Admin User{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Add Admin User</h5>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">Email <span class="text-danger">*</span></label>
+                <input type="email" name="email" class="form-control{% if form.email.errors %} is-invalid{% endif %}" value="{{ form.email.value|default:'' }}" required>
+                {% if form.email.errors %}<div class="invalid-feedback">{{ form.email.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">First Name</label>
+                <input type="text" name="first_name" class="form-control{% if form.first_name.errors %} is-invalid{% endif %}" value="{{ form.first_name.value|default:'' }}">
+                {% if form.first_name.errors %}<div class="invalid-feedback">{{ form.first_name.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Last Name</label>
+                <input type="text" name="last_name" class="form-control{% if form.last_name.errors %} is-invalid{% endif %}" value="{{ form.last_name.value|default:'' }}">
+                {% if form.last_name.errors %}<div class="invalid-feedback">{{ form.last_name.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Phone Number</label>
+                <input type="text" name="phone_number" class="form-control{% if form.phone_number.errors %} is-invalid{% endif %}" value="{{ form.phone_number.value|default:'' }}">
+                {% if form.phone_number.errors %}<div class="invalid-feedback">{{ form.phone_number.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password <span class="text-danger">*</span></label>
+                <input type="password" name="password" class="form-control{% if form.password.errors %} is-invalid{% endif %}" required>
+                {% if form.password.errors %}<div class="invalid-feedback">{{ form.password.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                <input type="password" name="confirm_password" class="form-control{% if form.confirm_password.errors %} is-invalid{% endif %}" required>
+                {% if form.confirm_password.errors %}<div class="invalid-feedback">{{ form.confirm_password.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Roles</label>
+                <div class="row g-2">
+                    {% for choice in form.groups %}
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            {{ choice }}
+                            <label class="form-check-label" for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if form.groups.errors %}<div class="invalid-feedback">{{ form.groups.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {% if form.is_active.value %}checked{% endif %}>
+                <label class="form-check-label" for="is_active">Active</label>
+            </div>
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
+            {% endif %}
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a href="{% url 'admin_panel:admin_user_list' %}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

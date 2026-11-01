@@ -4,6 +4,8 @@ Base settings for FineFit E-Commerce backend.
 
 from pathlib import Path
 import sys
+from datetime import timedelta
+
 import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -37,6 +39,13 @@ ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
 # Application definition
 INSTALLED_APPS = [
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
+    "unfold.contrib.inlines",
+    "unfold.contrib.import_export",
+    "unfold.contrib.guardian",
+    "unfold.contrib.simple_history",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -47,12 +56,16 @@ INSTALLED_APPS = [
     # Third-party applications
     "corsheaders",
     "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
 
     # Domain modular applications
     "apps.accounts.apps.AccountsConfig",
     "apps.catalog.apps.CatalogConfig",
     "apps.inventory.apps.InventoryConfig",
     "apps.cart.apps.CartConfig",
+    "apps.dashboard.apps.DashboardConfig",
+    "apps.admin_panel.apps.AdminPanelConfig",
 ]
 
 MIDDLEWARE = [
@@ -62,6 +75,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.accounts.middleware.TwoFactorRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -136,6 +150,106 @@ MEDIA_ROOT = BASE_DIR / "media"
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Django Unfold configuration
+UNFOLD = {
+    "SITE_TITLE": "FineFit Admin Panel",
+    "SITE_HEADER": "FineFit E-Commerce Administration",
+    "SITE_SUBHEADER": "Fashion e-commerce operations dashboard",
+    "SITE_FAVICON": "/static/images/favicon.png",
+    "SHOW_SEARCH": True,
+    "SEARCH_QUERY": "",
+    "SEARCH_INPUT_PLACEHOLDER": "Search categories, products, variants...",
+    "SITE_LOGO": "/static/images/logo.png",
+    "SITE_SYMBOL": "finefit",
+    "THEME": {
+        "dark_mode": True,
+        "colors": {
+            "primary": {
+                "50": "#f0f9ff",
+                "100": "#e0f2fe",
+                "200": "#bae6fd",
+                "300": "#7dd3fc",
+                "400": "#38bdf8",
+                "500": "#0ea5e9",
+                "600": "#0284c7",
+                "700": "#0369a1",
+                "800": "#075985",
+                "900": "#0c4a6e",
+            },
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_apps": True,
+        "navigation": [
+            {
+                "title": "Dashboard",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "Dashboard",
+                        "icon": "dashboard",
+                        "link": "/admin/",
+                    },
+                ],
+            },
+            {
+                "title": "Catalog",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "Categories",
+                        "icon": "category",
+                        "link": "/admin/catalog/category/",
+                    },
+                    {
+                        "title": "Subcategories",
+                        "icon": "subdirectory",
+                        "link": "/admin/catalog/subcategory/",
+                    },
+                    {
+                        "title": "Products",
+                        "icon": "inventory_2",
+                        "link": "/admin/catalog/product/",
+                    },
+                    {
+                        "title": "Product Variants",
+                        "icon": "tune",
+                        "link": "/admin/catalog/productvariant/",
+                    },
+                    {
+                        "title": "Product Images",
+                        "icon": "photo",
+                        "link": "/admin/catalog/productimage/",
+                    },
+                ],
+            },
+            {
+                "title": "Inventory",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "Stock Records",
+                        "icon": "storage",
+                        "link": "/admin/inventory/stockrecord/",
+                    },
+                ],
+            },
+            {
+                "title": "Accounts",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "Users",
+                        "icon": "person",
+                        "link": "/admin/accounts/customuser/",
+                    },
+                ],
+            },
+        ],
+    },
+}
+
 # Django REST Framework configuration
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -166,3 +280,64 @@ CSRF_COOKIE_HTTPONLY = False  # Allows frontend JavaScript to read csrftoken coo
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_HTTPONLY = True
+
+AUTHENTICATION_BACKENDS = [
+    "apps.accounts.authentication.EmailOrPhoneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+# Login/Logout URLs for admin panel HTML views
+LOGIN_URL = "/admin/login/"
+LOGOUT_REDIRECT_URL = "/admin/login/"
+LOGIN_REDIRECT_URL = "/admin/custom-dashboard/"
+
+# Session cookie age: 2 weeks (1209600 seconds) when "remember me" is used
+SESSION_COOKIE_AGE = 1209600
+
+# Email configuration (SMTP via env; console backend in dev)
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", default="localhost")
+EMAIL_PORT = env.int("EMAIL_PORT", default=25)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@finefit.store")
+SITE_NAME = env("SITE_NAME", default="FineFit")
+
+# Simple JWT configuration
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": False,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+# REST Framework authentication: JWT for API clients, Session for HTML panel
+REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = [
+    "rest_framework_simplejwt.authentication.JWTAuthentication",
+    "rest_framework.authentication.SessionAuthentication",
+]
+
+# Hardened session/cookie security
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SAMESITE = "Lax"
+
+# OTP / verification configuration
+OTP_CODE_LENGTH = 6
+OTP_CODE_EXPIRY_MINUTES = 10
+OTP_MAX_ATTEMPTS = 5
+VERIFICATION_MAX_PER_DAY = 15
+PASSWORD_RESET_TOKEN_EXPIRY_HOURS = 1
+SENSITIVE_ACTION_REVERIFY_WINDOW_MINUTES = 30
+
+# Device / browser verification (remember this device)
+DEVICE_VERIFICATION_COOKIE_NAME = "ff_device_token"
+DEVICE_VERIFICATION_DAYS = 30

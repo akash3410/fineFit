@@ -1,0 +1,170 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Account - FineFit Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background: #f4f6f8; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .login-card { width: 100%; max-width: 450px; }
+        .step-indicator { display: flex; justify-content: space-between; margin-bottom: 1.5rem; font-size: 0.85rem; }
+        .step { flex: 1; text-align: center; color: #6c757d; }
+        .step.active { color: #0ea5e9; font-weight: 600; }
+        .step.completed { color: #198754; font-weight: 600; }
+        .method-card { border: 2px solid #dee2e6; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: #fff; }
+        .method-card:hover { border-color: #0ea5e9; background: #f0f9ff; }
+        .method-card.selected { border-color: #0ea5e9; background: #e0f2fe; }
+        .method-card i { font-size: 2rem; color: #6c757d; margin-bottom: 0.75rem; }
+        .method-card.selected i { color: #0ea5e9; }
+        .method-card h6 { margin: 0; color: #495057; }
+        .method-card p { margin: 0.5rem 0 0; font-size: 0.9rem; color: #6c757d; word-break: break-all; }
+        .resend-timer { font-size: 0.85rem; color: #6c757d; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="login-card card shadow">
+        <div class="card-body p-4 p-md-5">
+            <div class="text-center mb-4">
+                <h3 class="card-title">FineFit Admin</h3>
+                <p class="text-muted">Verify Your Account</p>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% if step == "method" %}
+                <!-- Step 1: Choose verification method -->
+                <div class="step-indicator">
+                    <div class="step active">1. Choose Method</div>
+                    <div class="step">2. Enter Code</div>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="send_otp">
+                    <input type="hidden" name="purpose" value="{{ purpose|default:'registration' }}">
+
+                    <div class="mb-4">
+                        <label class="form-label">Send Verification Code To</label>
+                        <div class="row g-3">
+                            {% for method, dest, label in available_methods %}
+                            <div class="col-6">
+                                <div class="method-card" onclick="selectMethod(this, '{{ method }}')">
+                                    <i class="bi {% if method == 'email' %}bi-envelope{% else %}bi-phone{% endif %}"></i>
+                                    <h6>{{ label }}</h6>
+                                    <p>{{ dest }}</p>
+                                    <input type="radio" name="channel" value="{{ method }}" id="method_{{ method }}" style="display:none;" {% if forloop.first %}checked{% endif %}>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if not available_methods %}
+                        <div class="alert alert-warning">
+                            No email or phone number found on your account. Please contact support.
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">Send Code</button>
+                    </div>
+                </form>
+
+            {% elif step == "otp" %}
+                <!-- Step 2: Enter OTP code -->
+                <div class="step-indicator">
+                    <div class="step completed">1. Choose Method</div>
+                    <div class="step active">2. Enter Code</div>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    A 6-digit code has been sent to <strong>{{ identifier }}</strong> via <strong>{{ channel }}</strong>.
+                </div>
+
+                <form method="post" novalidate id="verifyOtpForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="verify_otp">
+                    <input type="hidden" name="purpose" value="{{ purpose|default:'registration' }}">
+
+                    <div class="mb-3">
+                        <label class="form-label">Verification Code</label>
+                        <input type="text" name="code" class="form-control" placeholder="123456" required maxlength="6" autofocus>
+                        <div class="form-text">Enter the 6-digit code sent to your {{ channel }}.</div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">Verify Code</button>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <button type="button" class="btn btn-outline-secondary w-100" onclick="resendOtp()">
+                        <i class="bi bi-arrow-repeat me-2"></i>Resend Code
+                    </button>
+                    <div class="resend-timer" id="resendTimer">Code can be resent after <span id="countdown">60</span>s</div>
+                </form>
+
+            {% endif %}
+
+            <div class="text-center mt-4">
+                <a href="/admin/logout/" class="btn btn-outline-secondary">Back to Login</a>
+            </div>
+            <div class="text-center mt-2">
+                <p class="small text-muted">&copy; 2026 FineFit Admin Panel</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Method card selection
+        function selectMethod(card, method) {
+            // Remove selection from all cards
+            document.querySelectorAll('.method-card').forEach(c => {
+                c.classList.remove('selected');
+            });
+            card.classList.add('selected');
+            // Set the radio input
+            var radio = document.getElementById('method_' + method);
+            if (radio) radio.checked = true;
+        }
+
+        // Countdown for resend button
+        let countdown = 60;
+        const timerEl = document.getElementById('countdown');
+        const resendBtn = document.querySelector('button[onclick="resendOtp()"]');
+        const timerInterval = setInterval(function() {
+            countdown--;
+            if (timerEl) timerEl.textContent = countdown;
+            if (countdown <= 0) {
+                clearInterval(timerInterval);
+                if (timerEl) timerEl.textContent = '0';
+                if (resendBtn) {
+                    resendBtn.disabled = false;
+                }
+            }
+        }, 1000);
+
+        function resendOtp() {
+            if (countdown > 0) return;
+            const form = document.getElementById('verifyOtpForm');
+            const hiddenAction = document.createElement('input');
+            hiddenAction.type = 'hidden';
+            hiddenAction.name = 'action';
+            hiddenAction.value = 'resend_otp';
+            form.appendChild(hiddenAction);
+            form.submit();
+        }
+    </script>
+</body>
+</html>

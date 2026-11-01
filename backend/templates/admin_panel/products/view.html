@@ -1,0 +1,88 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}View Product - FineFit Admin{% endblock %}
+{% block page_title %}Product Details{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">{{ product.title }}</h5>
+        <div>
+            <a href="/admin/products/{{ product.id }}/edit/" class="btn btn-primary btn-sm"><i class="bi bi-pencil"></i> Edit</a>
+            <a href="/admin/products/" class="btn btn-secondary btn-sm">Back</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Title:</strong> {{ product.title }}</p>
+                <p><strong>SKU:</strong> {{ product.sku|default:"-" }}</p>
+                <p><strong>Slug:</strong> {{ product.slug }}</p>
+                <p><strong>Category:</strong> {{ product.category.name }}</p>
+                <p><strong>Subcategory:</strong> {{ product.subcategory.name|default:"-" }}</p>
+                <p><strong>Status:</strong> {% if product.status %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</p>
+                <p><strong>Published:</strong> {% if product.is_published %}<span class="badge bg-success">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</p>
+                <p><strong>Featured:</strong> {% if product.is_featured %}<span class="badge bg-success">Yes</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Price:</strong> ${{ product.price }}</p>
+                <p><strong>Discount Price:</strong> {% if product.discount_price %}${{ product.discount_price }}{% else %}-{% endif %}</p>
+                <p><strong>Stock:</strong> {{ product.stock }}</p>
+                <p><strong>Created:</strong> {{ product.created_at }}</p>
+                <p><strong>Updated:</strong> {{ product.updated_at }}</p>
+            </div>
+        </div>
+        <p><strong>Description:</strong></p>
+        <p>{{ product.description|linebreaksbr|default:"No description" }}</p>
+    </div>
+</div>
+
+{% if images %}
+<div class="card mb-3">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Product Images</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for img in images %}
+            <div class="col-md-3">
+                <img src="{{ img.image.url }}" class="img-thumbnail" style="height: 200px; object-fit: cover; width: 100%;">
+                {% if img.is_main or img.is_primary %}<span class="badge bg-primary mt-1">Main</span>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if variants %}
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Variants</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>SKU</th>
+                    <th>Size</th>
+                    <th>Color</th>
+                    <th>Stock</th>
+                    <th>Price Override</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in variants %}
+                <tr>
+                    <td>{{ v.sku }}</td>
+                    <td>{{ v.size|default:"-" }}</td>
+                    <td>{{ v.color_name|default:"-" }}</td>
+                    <td>{{ v.stock }}</td>
+                    <td>{% if v.price_override %}${{ v.price_override }}{% else %}-{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
