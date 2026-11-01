@@ -1,0 +1,181 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Roles & Permissions - FineFit Admin{% endblock %}
+{% block page_title %}Roles & Permissions{% endblock %}
+
+{% block content %}
+<ul class="nav nav-tabs mb-3" id="accessControlTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if tab == 'roles' or not tab %}active{% endif %}" id="roles-tab" data-bs-toggle="tab" data-bs-target="#roles" type="button" role="tab">Roles</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if tab == 'matrix' %}active{% endif %}" id="matrix-tab" data-bs-toggle="tab" data-bs-target="#matrix" type="button" role="tab">Permission Matrix</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if tab == 'permissions' %}active{% endif %}" id="permissions-tab" data-bs-toggle="tab" data-bs-target="#permissions" type="button" role="tab">All Permissions</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="accessControlTabsContent">
+    <div class="tab-pane fade {% if tab == 'roles' or not tab %}show active{% endif %}" id="roles" role="tabpanel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Roles</h5>
+            <a href="{% url 'admin_panel:role_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add Role</a>
+        </div>
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Permissions</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for role in roles %}
+                            <tr>
+                                <td>{{ role.name }}</td>
+                                <td>{{ role.permissions.count }} permission{{ role.permissions.count|pluralize }}</td>
+                                <td class="text-end">
+                                    <a href="{% url 'admin_panel:role_edit' role.pk %}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete({{ role.pk }}, 'role', '{{ role.name|escapejs }}', '{% url 'admin_panel:role_delete' role.pk %}')" title="Delete"><i class="bi bi-trash"></i></button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4">No roles found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade {% if tab == 'matrix' %}show active{% endif %}" id="matrix" role="tabpanel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Permission Matrix</h5>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_matrix">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 70vh;">
+                        <table class="table table-bordered table-sm mb-0">
+                            <thead class="table-light" style="position: sticky; top: 0; z-index: 10;">
+                                <tr>
+                                    <th style="position: sticky; left: 0; background: #f8f9fa; z-index: 11;">Permission</th>
+                                    {% for role in roles %}
+                                    <th class="text-center" style="min-width: 120px;">{{ role.name }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for app_label, perms in permissions_by_app.items %}
+                                <tr class="table-secondary">
+                                    <td colspan="{{ roles|length|add:1 }}" style="position: sticky; left: 0;"><strong>{{ app_label|title }}</strong></td>
+                                </tr>
+                                {% for perm in perms %}
+                                <tr>
+                                    <td style="position: sticky; left: 0; background: white;" title="{{ perm.name }}">
+                                        <small>{{ perm.codename }}</small>
+                                    </td>
+                                    {% for role in roles %}
+                                    <td class="text-center">
+                                        <input type="checkbox" name="perms_{{ role.id }}" value="{{ perm.id }}" {% if perm in role.permissions.all %}checked{% endif %}>
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="tab-pane fade {% if tab == 'permissions' %}show active{% endif %}" id="permissions" role="tabpanel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">All Permissions</h5>
+        </div>
+        <div class="card mb-3">
+            <div class="card-body">
+                <form method="get" class="row g-2">
+                    <input type="hidden" name="tab" value="permissions">
+                    <div class="col-md-6">
+                        <input type="text" name="q" class="form-control" placeholder="Search by codename or name..." value="{{ search }}">
+                    </div>
+                    <div class="col-md-4">
+                        <select name="app" class="form-select">
+                            <option value="">All Apps</option>
+                            {% for app in apps %}
+                            <option value="{{ app }}" {% if app_filter == app %}selected{% endif %}>{{ app|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-outline-primary w-100"><i class="bi bi-search"></i> Search</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Codename</th>
+                                <th>Content Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for perm in permissions %}
+                            <tr>
+                                <td>{{ perm.name }}</td>
+                                <td>{{ perm.codename }}</td>
+                                <td>{{ perm.content_type.app_label }}.{{ perm.content_type.model }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4">No permissions found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="card-footer bg-white">
+                <nav>
+                    <ul class="pagination mb-0 justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?tab=permissions&page={{ page_obj.previous_page_number }}{% if search %}&q={{ search }}{% endif %}{% if app_filter %}&app={{ app_filter }}{% endif %}">Previous</a></li>
+                        {% endif %}
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item"><a class="page-link" href="?tab=permissions&page={{ num }}{% if search %}&q={{ search }}{% endif %}{% if app_filter %}&app={{ app_filter }}{% endif %}">{{ num }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+                        {% if page_obj.has_next %}
+                            <li class="page-item"><a class="page-link" href="?tab=permissions&page={{ page_obj.next_page_number }}{% if search %}&q={{ search }}{% endif %}{% if app_filter %}&app={{ app_filter }}{% endif %}">Next</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

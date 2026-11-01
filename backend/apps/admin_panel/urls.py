@@ -27,11 +27,15 @@ urlpatterns = [
     path("admins/<uuid:pk>/toggle/", admin_user_views.admin_user_toggle, name="admin_user_toggle"),
     
     # Roles & Permissions
-    path("roles/", role_views.role_list, name="role_list"),
+    path("access-control/", role_views.access_control, name="access_control"),
+    # Keep old URLs for backward compatibility
+    path("roles/", role_views.access_control, name="role_list"),
     path("roles/create/", role_views.role_create, name="role_create"),
     path("roles/<int:pk>/edit/", role_views.role_edit, name="role_edit"),
     path("roles/<int:pk>/delete/", role_views.role_delete, name="role_delete"),
-    path("permissions/", role_views.permission_list, name="permission_list"),
+    path("permissions/", role_views.access_control, name="permission_list"),
+    
+    path("", views.dashboard, name="dashboard"),
     
     # Categories
     path("", views.category_list, name="category_list"),
