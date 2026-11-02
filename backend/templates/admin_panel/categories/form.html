@@ -8,7 +8,7 @@
         <h5 class="mb-0">{{ action }} Category</h5>
     </div>
     <div class="card-body">
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="mb-3">
                 <label class="form-label">Name <span class="text-danger">*</span></label>
@@ -21,6 +21,19 @@
             <div class="mb-3">
                 <label class="form-label">Description</label>
                 <textarea name="description" class="form-control" rows="3">{{ category.description|default:'' }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Image</label>
+                {% if category.image %}
+                <div class="mb-2">
+                    <img src="{{ category.image.url }}" alt="{{ category.name }}" style="max-height: 100px;" class="img-thumbnail">
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="clear_image" id="clear_image">
+                    <label class="form-check-label" for="clear_image">Remove current image</label>
+                </div>
+                {% endif %}
+                <input type="file" name="image" class="form-control" accept="image/*">
             </div>
             <div class="mb-3">
                 <label class="form-label">Status</label>

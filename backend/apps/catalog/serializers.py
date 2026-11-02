@@ -393,6 +393,7 @@ class ProductVariantNestedWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVariant
         fields = [
+            "id",
             "sku",
             "size",
             "color_name",
@@ -400,6 +401,7 @@ class ProductVariantNestedWriteSerializer(serializers.ModelSerializer):
             "price_override",
             "is_active",
         ]
+        read_only_fields = ["id"]  # allow id to be passed in for updates but not required
 
     def validate_color_code(self, value: str) -> str:
         if value:
@@ -415,19 +417,39 @@ class ProductVariantNestedWriteSerializer(serializers.ModelSerializer):
         return value
 
     def validate_sku(self, value: str) -> str:
+        if not value:
+            return value
         qs = ProductVariant.objects.filter(sku=value)
+        instance = getattr(self, 'instance', None)
+        if instance and getattr(instance, 'pk', None):
+            # Skip check if SKU unchanged
+            if getattr(instance, 'sku') == value:
+                return value
+            qs = qs.exclude(pk=instance.pk)
+        if self.context.get('skip_sku_check'):
+            return value
         if qs.exists():
             raise ValidationError(_("A variant with this SKU already exists."))
         return value
 
     def validate(self, attrs):
+        # Determine instance context
+        instance_obj = getattr(self, 'instance', None)
+        if instance_obj and not getattr(instance_obj, 'pk', None):
+            instance_obj = None
+        # Reuse the model's cross-field rules (duplicate size/colour, etc.).
+        product = getattr(instance_obj, 'product', None) if instance_obj else None
         instance = ProductVariant(
-            sku=attrs.get("sku", ""),
-            size=attrs.get("size", ""),
-            color_name=attrs.get("color_name", ""),
-            color_code=attrs.get("color_code", ""),
-            price_override=attrs.get("price_override", None),
-            is_active=attrs.get("is_active", True),
+            pk=getattr(instance_obj, 'pk', None),
+            product=product,
+            sku=attrs.get("sku", getattr(instance_obj, 'sku', "") if instance_obj else ""),
+            size=attrs.get("size", getattr(instance_obj, 'size', "") if instance_obj else ""),
+            color_name=attrs.get("color_name", getattr(instance_obj, 'color_name', "") if instance_obj else ""),
+            color_code=attrs.get("color_code", getattr(instance_obj, 'color_code', "") if instance_obj else ""),
+            price_override=attrs.get(
+                "price_override", getattr(instance_obj, 'price_override', None) if instance_obj else None
+            ),
+            is_active=attrs.get("is_active", getattr(instance_obj, 'is_active', True) if instance_obj else True),
         )
         instance.clean()
         return attrs
@@ -441,20 +463,30 @@ class ProductWriteSerializer(serializers.ModelSerializer):
 
     slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
     base_price = serializers.DecimalField(
-        max_digits=10, decimal_places=2, min_value=Decimal("0")
+        max_digits=10, decimal_places=2, min_value=Decimal("0"), required=False
     )
-    variants = ProductVariantNestedWriteSerializer(many=True, required=False)
+    price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0"), required=False
+    )
+    variants = serializers.ListField(child=serializers.DictField(), required=False, write_only=True)
 
     class Meta:
         model = Product
         fields = [
             "id",
             "category",
+            "subcategory",
             "title",
             "slug",
+            "sku",
             "description",
+            "price",
             "base_price",
+            "discount_price",
+            "stock",
+            "status",
             "is_published",
+            "is_featured",
             "variants",
         ]
 
@@ -462,6 +494,21 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         if value < Decimal("0"):
             raise ValidationError(_("Base price cannot be negative."))
         return value
+
+    def validate_price(self, value):
+        if value < Decimal("0"):
+            raise ValidationError(_("Price cannot be negative."))
+        return value
+
+    def validate(self, attrs):
+        # Map base_price to price for backward compatibility
+        if "base_price" in attrs and "price" not in attrs:
+            attrs["price"] = attrs.pop("base_price")
+        elif "base_price" in attrs:
+            attrs.pop("base_price")
+        # Don't let variants cause issues in product validation
+        attrs.pop('variants', None)
+        return attrs
 
     def _ensure_slug(self, validated_data):
         base = validated_data.get("slug") or validated_data.get("title") or "product"
@@ -499,11 +546,63 @@ class ProductWriteSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        # Nested variants are managed through the dedicated variant endpoints on
-        # update to avoid destructive mass-replacement; only scalar fields change here.
-        validated_data.pop("variants", None)
+        variants_data = validated_data.pop("variants", None)
+        if variants_data is None and hasattr(self, 'initial_data'):
+            # Try different possible keys
+            for key in ['variants', 'product_variants', 'variant']:
+                if key in self.initial_data:
+                    variants_data = self.initial_data.get(key)
+                    break
         if not validated_data.get("slug"):
             validated_data.pop("slug", None)
         else:
             validated_data = self._ensure_slug(validated_data)
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+
+        if variants_data is not None:
+            # Handle if it's a single dict
+            if isinstance(variants_data, dict):
+                variants_data = [variants_data]
+            variant_errors = []
+            for idx, variant_data in enumerate(variants_data):
+                if isinstance(variant_data, str):
+                    continue
+                variant_data = dict(variant_data)
+                variant_id = variant_data.pop("id", None) or variant_data.pop("pk", None) or variant_data.pop("uuid", None)
+                if variant_id:
+                    try:
+                        variant = ProductVariant.objects.get(id=variant_id, product=instance)
+                    except ProductVariant.DoesNotExist:
+                        variant_errors.append({idx: [{"id": [_("Variant not found or does not belong to this product.")]}]})
+                        continue
+                    sku_data = variant_data.get('sku')
+                    if sku_data and str(sku_data) != str(variant.sku):
+                        if ProductVariant.objects.filter(sku=sku_data).exclude(pk=variant.pk).exists():
+                            variant_errors.append({idx: {'sku': [_("A variant with this SKU already exists.")]}})
+                            continue
+                    update_fields = []
+                    for attr, value in variant_data.items():
+                        if attr in ['product']:
+                            continue
+                        setattr(variant, attr, value)
+                        update_fields.append(attr)
+                    try:
+                        if update_fields:
+                            variant.save(update_fields=update_fields)
+                        else:
+                            variant.save()
+                    except Exception as exc:
+                        variant_errors.append({idx: {"non_field_errors": [str(exc)]}})
+                        continue
+                    continue
+                else:
+                    nested_ser = ProductVariantNestedWriteSerializer(data=variant_data)
+                    if not nested_ser.is_valid():
+                        variant_errors.append({idx: nested_ser.errors})
+                        continue
+                    variant = nested_ser.save(product=instance)
+
+            if variant_errors:
+                raise ValidationError({"variants": variant_errors})
+
+        return instance

@@ -60,7 +60,7 @@ class ProductVariantInline(admin.TabularInline):
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 0
-    fields = ("image", "alt_text", "display_order", "is_main", "is_primary", "variant")
+    fields = ("image", "alt_text", "display_order", "is_primary", "variant")
     readonly_fields = ("id",)
 
 
@@ -111,8 +111,8 @@ class ProductVariantAdmin(ModelAdmin):
 
 @admin.register(ProductImage)
 class ProductImageAdmin(ModelAdmin):
-    list_display = ("id", "product", "variant", "display_order", "is_main", "is_primary")
-    list_filter = ("is_main", "is_primary")
+    list_display = ("id", "product", "variant", "display_order", "is_primary")
+    list_filter = ("is_primary",)
     search_fields = ("product__title",)
     ordering = ("product__title", "display_order")
     readonly_fields = ("created_at", "updated_at")

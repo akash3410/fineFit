@@ -53,12 +53,15 @@ def category_add(request):
         elif Category.objects.filter(slug=slug).exists():
             messages.error(request, 'Slug already exists.')
         else:
-            Category.objects.create(
+            category = Category.objects.create(
                 name=name,
                 slug=slug,
                 description=description,
                 is_active=is_active,
             )
+            if request.FILES.get('image'):
+                category.image = request.FILES['image']
+                category.save(update_fields=['image'])
             messages.success(request, 'Category created successfully.')
             return redirect('admin_panel:category_list')
     return render(request, 'admin_panel/categories/form.html', {'action': 'Add'})
@@ -96,6 +99,10 @@ def category_edit(request, pk):
             category.slug = slug
             category.description = description
             category.is_active = is_active
+            if request.FILES.get('image'):
+                category.image = request.FILES['image']
+            elif request.POST.get('clear_image') == 'on':
+                category.image = None
             category.save()
             messages.success(request, 'Category updated successfully.')
             return redirect('admin_panel:category_list')
@@ -161,13 +168,16 @@ def subcategory_add(request):
             elif Subcategory.objects.filter(category=category, name=name).exists():
                 messages.error(request, 'Subcategory name already exists for this category.')
             else:
-                Subcategory.objects.create(
+                subcategory = Subcategory.objects.create(
                     category=category,
                     name=name,
                     slug=slug,
                     description=description,
                     is_active=is_active,
                 )
+                if request.FILES.get('image'):
+                    subcategory.image = request.FILES['image']
+                    subcategory.save(update_fields=['image'])
                 messages.success(request, 'Subcategory created successfully.')
                 return redirect('admin_panel:subcategory_list')
     return render(request, 'admin_panel/subcategories/form.html', {'categories': categories, 'action': 'Add'})
@@ -210,6 +220,10 @@ def subcategory_edit(request, pk):
                 subcategory.slug = slug
                 subcategory.description = description
                 subcategory.is_active = is_active
+                if request.FILES.get('image'):
+                    subcategory.image = request.FILES['image']
+                elif request.POST.get('clear_image') == 'on':
+                    subcategory.image = None
                 subcategory.save()
                 messages.success(request, 'Subcategory updated successfully.')
                 return redirect('admin_panel:subcategory_list')
@@ -328,7 +342,6 @@ def product_add(request):
                         alt_text=title,
                         display_order=idx,
                         is_primary=is_main,
-                        is_main=is_main,
                     )
                 messages.success(request, 'Product created successfully.')
                 return redirect('admin_panel:product_list')
@@ -392,6 +405,54 @@ def product_edit(request, pk):
                 product.is_published = is_published
                 product.is_featured = is_featured
                 product.save()
+                # Handle variants
+                variant_ids = request.POST.getlist('variant_id')
+                variant_skus = request.POST.getlist('variant_sku')
+                variant_sizes = request.POST.getlist('variant_size')
+                variant_colors = request.POST.getlist('variant_color')
+                variant_stocks = request.POST.getlist('variant_stock')
+                variant_prices = request.POST.getlist('variant_price')
+                # Track which variant IDs are submitted to handle deletions if needed
+                submitted_ids = []
+                for i in range(len(variant_skus)):
+                    if variant_skus[i]:
+                        variant_id = variant_ids[i] if i < len(variant_ids) and variant_ids[i] else None
+                        v_sku = variant_skus[i]
+                        v_size = variant_sizes[i] if i < len(variant_sizes) else ''
+                        v_color = variant_colors[i] if i < len(variant_colors) else ''
+                        v_stock = int(variant_stocks[i]) if i < len(variant_stocks) and variant_stocks[i] else 0
+                        v_price = Decimal(variant_prices[i]) if i < len(variant_prices) and variant_prices[i] else None
+                        if variant_id:
+                            try:
+                                var = ProductVariant.objects.get(id=variant_id, product=product)
+                                var.sku = v_sku
+                                var.size = v_size
+                                var.color_name = v_color
+                                var.stock = v_stock
+                                var.price_override = v_price
+                                var.save()
+                                submitted_ids.append(var.id)
+                            except ProductVariant.DoesNotExist:
+                                var = ProductVariant.objects.create(
+                                    product=product,
+                                    sku=v_sku,
+                                    size=v_size,
+                                    color_name=v_color,
+                                    stock=v_stock,
+                                    price_override=v_price,
+                                )
+                                submitted_ids.append(var.id)
+                        else:
+                            var = ProductVariant.objects.create(
+                                product=product,
+                                sku=v_sku,
+                                size=v_size,
+                                color_name=v_color,
+                                stock=v_stock,
+                                price_override=v_price,
+                            )
+                            submitted_ids.append(var.id)
+                # Optionally delete variants not submitted? Or leave them - be conservative and don't delete
                 messages.success(request, 'Product updated successfully.')
                 return redirect('admin_panel:product_list')
             except Exception as e:

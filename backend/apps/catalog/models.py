@@ -52,6 +52,16 @@ def product_image_upload_path(instance, filename: str) -> str:
     return f"catalog/products/{instance.product_id}/{uuid.uuid4().hex}{extension}"
 
 
+def category_image_upload_path(instance, filename: str) -> str:
+    extension = os.path.splitext(filename)[1].lower()
+    return f"catalog/categories/{instance.pk or uuid.uuid4().hex}/{uuid.uuid4().hex}{extension}"
+
+
+def subcategory_image_upload_path(instance, filename: str) -> str:
+    extension = os.path.splitext(filename)[1].lower()
+    return f"catalog/subcategories/{instance.pk or uuid.uuid4().hex}/{uuid.uuid4().hex}{extension}"
+
+
 class CategoryQuerySet(models.QuerySet):
     """Queryset helpers for the category tree."""
 
@@ -93,6 +103,13 @@ class Category(models.Model):
         null=True,
         blank=True,
         help_text=_("Timestamp when the category was soft-deleted."),
+    )
+    image = models.ImageField(
+        _("image"),
+        upload_to=category_image_upload_path,
+        blank=True,
+        null=True,
+        help_text=_("Image for this category."),
     )
     parent = models.ForeignKey(
         "self",
@@ -212,6 +229,13 @@ class Subcategory(models.Model):
         _("deleted at"),
         null=True,
         blank=True,
+    )
+    image = models.ImageField(
+        _("image"),
+        upload_to=subcategory_image_upload_path,
+        blank=True,
+        null=True,
+        help_text=_("Image for this subcategory."),
     )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
@@ -428,6 +452,9 @@ class Product(models.Model):
             raise ValidationError(
                 {"discount_price": _("Discount price must be less than the regular price.")}
             )
+        if self.is_published and not self.is_deleted:
+            if not self.variants.filter(is_active=True).exists():
+                raise ValidationError({"is_published": _("A published product must have at least one active variant.")})
 
     def soft_delete(self):
         """Mark the product as deleted without physically removing it."""
@@ -617,11 +644,6 @@ class ProductImage(models.Model):
         default=False,
         help_text=_("The single primary image shown on list/detail views."),
     )
-    is_main = models.BooleanField(
-        _("main image"),
-        default=False,
-        help_text=_("The main/primary image for product display."),
-    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
@@ -638,7 +660,7 @@ class ProductImage(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"Image for {self.product_id} ({'primary' if self.is_primary or self.is_main else 'secondary'})"
+        return f"Image for {self.product_id} ({'primary' if self.is_primary else 'secondary'})"
 
     def clean(self):
         super().clean()
@@ -649,8 +671,3 @@ class ProductImage(models.Model):
                 raise ValidationError(
                     {"variant": _("The selected variant does not belong to this product.")}
                 )
-        # Sync is_main with is_primary for backward compatibility
-        if self.is_main and not self.is_primary:
-            self.is_primary = True
-        elif self.is_primary and not self.is_main:
-            self.is_main = True

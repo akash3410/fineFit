@@ -110,7 +110,8 @@
         <div class="card-body">
             <div id="variantsContainer">
                 {% for variant in variants %}
-                <div class="row mb-2 variant-row">
+                <div class="row mb-2 variant-row align-items-center">
+                    <input type="hidden" name="variant_id" value="{{ variant.id }}">
                     <div class="col-md-2">
                         <input type="text" name="variant_sku" class="form-control" placeholder="SKU" value="{{ variant.sku }}">
                     </div>
@@ -147,8 +148,9 @@
 function addVariant() {
     const container = document.getElementById('variantsContainer');
     const div = document.createElement('div');
-    div.className = 'row mb-2 variant-row';
+    div.className = 'row mb-2 variant-row align-items-center';
     div.innerHTML = `
+        <input type="hidden" name="variant_id" value="">
         <div class="col-md-2">
             <input type="text" name="variant_sku" class="form-control" placeholder="SKU">
         </div>
@@ -159,7 +161,7 @@ function addVariant() {
             <input type="text" name="variant_color" class="form-control" placeholder="Color">
         </div>
         <div class="col-md-2">
-            <input type="number" name="variant_stock" class="form-control" placeholder="Stock">
+            <input type="number" name="variant_stock" class="form-control" placeholder="Stock" value="0">
         </div>
         <div class="col-md-2">
             <input type="number" step="0.01" name="variant_price" class="form-control" placeholder="Price Override">
