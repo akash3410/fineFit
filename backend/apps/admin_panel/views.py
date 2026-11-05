@@ -12,10 +12,30 @@ from .decorators import admin_access_required, superuser_required
 
 from apps.catalog.models import Category, Subcategory, Product, ProductVariant, ProductImage, Event
 from apps.dashboard.views import get_dashboard_context
+from apps.inventory.exceptions import InvalidStockAdjustmentError
+from apps.inventory.services import StockService
 
 
 def staff_required(user):
     return user.is_active and user.is_staff
+
+
+def sync_variant_inventory(request, variant, declared_stock):
+    """
+    Mirror the catalog form's stock value into the inventory ledger.
+
+    The storefront cart trusts ``StockRecord`` only, so a variant saved with a
+    stock quantity but no inventory balance would look available on the product
+    page and then be refused when adding to the cart.
+    """
+    actor = request.user if request.user.is_authenticated else None
+    try:
+        StockService.sync_declared_stock(variant, declared_stock, actor=actor)
+    except InvalidStockAdjustmentError as exc:
+        messages.warning(
+            request,
+            f"Stock for variant {variant.sku} was saved but not synced to inventory: {exc}",
+        )
 
 
 @user_passes_test(admin_access_required)
@@ -324,14 +344,16 @@ def product_add(request):
                 variant_prices = request.POST.getlist('variant_price')
                 for i in range(len(variant_skus)):
                     if variant_skus[i]:
-                        ProductVariant.objects.create(
+                        v_stock = int(variant_stocks[i]) if i < len(variant_stocks) and variant_stocks[i] else 0
+                        variant = ProductVariant.objects.create(
                             product=product,
                             sku=variant_skus[i],
                             size=variant_sizes[i] if i < len(variant_sizes) else '',
                             color_name=variant_colors[i] if i < len(variant_colors) else '',
-                            stock=int(variant_stocks[i]) if i < len(variant_stocks) and variant_stocks[i] else 0,
+                            stock=v_stock,
                             price_override=Decimal(variant_prices[i]) if i < len(variant_prices) and variant_prices[i] else None,
                         )
+                        sync_variant_inventory(request, variant, v_stock)
                 # Handle images
                 main_image_idx = request.POST.get('main_image')
                 for idx, img in enumerate(request.FILES.getlist('images')):
@@ -432,6 +454,7 @@ def product_edit(request, pk):
                                 var.price_override = v_price
                                 var.save()
                                 submitted_ids.append(var.id)
+                                sync_variant_inventory(request, var, v_stock)
                             except ProductVariant.DoesNotExist:
                                 var = ProductVariant.objects.create(
                                     product=product,
@@ -442,6 +465,7 @@ def product_edit(request, pk):
                                     price_override=v_price,
                                 )
                                 submitted_ids.append(var.id)
+                                sync_variant_inventory(request, var, v_stock)
                         else:
                             var = ProductVariant.objects.create(
                                 product=product,
@@ -452,6 +476,7 @@ def product_edit(request, pk):
                                 price_override=v_price,
                             )
                             submitted_ids.append(var.id)
+                            sync_variant_inventory(request, var, v_stock)
                 # Optionally delete variants not submitted? Or leave them - be conservative and don't delete
                 messages.success(request, 'Product updated successfully.')
                 return redirect('admin_panel:product_list')

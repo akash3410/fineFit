@@ -1,15 +1,28 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getProduct } from '../api/catalog'
+import { MAX_QUANTITY_PER_ITEM } from '../api/cart'
+import { useCart } from '../features/cart/CartContext'
 import type { ProductDetail } from '../types/catalog'
 import { formatBDT } from '../utils/currency'
 
+const STOCK_LABELS: Record<string, string> = {
+  IN_STOCK: 'In stock',
+  LOW_STOCK: 'Low stock',
+  OUT_OF_STOCK: 'Sold out',
+}
+
 export function ProductDetail() {
   const { slug } = useParams<{ slug: string }>()
+  const { addItem, isMutating } = useCart()
   const [product, setProduct] = useState<ProductDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null)
+  const [quantity, setQuantity] = useState(1)
+  const [feedback, setFeedback] = useState<
+    { type: 'success'; message: string } | { type: 'error'; message: string } | null
+  >(null)
 
   useEffect(() => {
     async function load() {
@@ -17,7 +30,7 @@ export function ProductDetail() {
       try {
         const data = await getProduct(slug)
         setProduct(data)
-        const active = (data.variants || []).find((v: any) => v.is_active)
+        const active = (data.variants || []).find((v) => v.is_active)
         if (active) setSelectedVariant(active.id)
       } catch {
         setError('Failed to load product')
@@ -35,9 +48,31 @@ export function ProductDetail() {
   // Show the flagged primary image in the hero slot (list views use
   // ``primary_image``); fall back to the first image when none is flagged.
   const hero = images.find((img) => img.is_primary) ?? images[0]
-  const variants = (product.variants || []).filter(v => v.is_active)
-  const activeVariant = variants.find(v => v.id === selectedVariant)
+  const variants = (product.variants || []).filter((v) => v.is_active)
+  const activeVariant = variants.find((v) => v.id === selectedVariant)
   const price = activeVariant?.effective_price || product.base_price
+  const soldOut = activeVariant?.is_in_stock === false
+  const canAddToCart = Boolean(activeVariant) && !soldOut && !isMutating
+
+  const selectVariant = (variantId: string) => {
+    setSelectedVariant(variantId)
+    setQuantity(1)
+    setFeedback(null)
+  }
+
+  const handleAddToCart = async () => {
+    if (!activeVariant) return
+    setFeedback(null)
+    const result = await addItem(activeVariant.id, quantity)
+    setFeedback(
+      result.ok
+        ? {
+            type: 'success',
+            message: `${quantity} × ${[activeVariant.size, activeVariant.color_name].filter(Boolean).join(' / ') || activeVariant.sku} added to your bag.`,
+          }
+        : { type: 'error', message: result.error },
+    )
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
@@ -55,7 +90,7 @@ export function ProductDetail() {
               <h2 className="mb-3 text-sm font-medium">Select variant</h2>
               <div className="flex flex-wrap gap-2">
                 {variants.map((variant) => (
-                  <button key={variant.id} onClick={() => setSelectedVariant(variant.id)} className={selectedVariant===variant.id ? "rounded-md border border-stone-900 bg-stone-900 px-3 py-2 text-sm text-white" : "rounded-md border border-stone-300 px-3 py-2 text-sm hover:bg-stone-50"}>
+                  <button key={variant.id} onClick={() => selectVariant(variant.id)} className={selectedVariant===variant.id ? "rounded-md border border-stone-900 bg-stone-900 px-3 py-2 text-sm text-white" : "rounded-md border border-stone-300 px-3 py-2 text-sm hover:bg-stone-50"}>
                     {[variant.size, variant.color_name].filter(Boolean).join(' / ') || variant.sku}
                   </button>
                 ))}
@@ -63,7 +98,77 @@ export function ProductDetail() {
               {activeVariant && <p className="mt-3 text-sm text-stone-600">SKU: {activeVariant.sku}</p>}
             </div>
           )}
-          <div className="mt-8"><p className="text-sm text-stone-600">{variants.length > 0 ? 'Available' : 'Contact for availability'}</p></div>
+
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <p className={`text-sm ${soldOut ? 'text-red-600' : 'text-stone-600'}`}>
+              {variants.length === 0
+                ? 'Contact for availability'
+                : STOCK_LABELS[activeVariant?.stock_status ?? ''] ?? 'Available'}
+            </p>
+            {activeVariant?.stock_status === 'LOW_STOCK' && (
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-800">Selling fast</span>
+            )}
+          </div>
+
+          {activeVariant && (
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              <div className="inline-flex items-center rounded-md border border-stone-300">
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  disabled={quantity <= 1 || isMutating}
+                  className="flex h-11 w-11 items-center justify-center text-lg text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300"
+                  aria-label="Decrease quantity"
+                >
+                  −
+                </button>
+                <span className="w-10 text-center text-sm tabular-nums" aria-live="polite">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.min(MAX_QUANTITY_PER_ITEM, q + 1))}
+                  disabled={quantity >= MAX_QUANTITY_PER_ITEM || isMutating}
+                  className="flex h-11 w-11 items-center justify-center text-lg text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleAddToCart()}
+                disabled={!canAddToCart}
+                className="min-w-[220px] rounded-md bg-stone-900 px-6 py-3 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+              >
+                {isMutating ? 'Adding…' : soldOut ? 'Sold out' : 'Add to cart'}
+              </button>
+            </div>
+          )}
+
+          {feedback && (
+            <div
+              role={feedback.type === 'error' ? 'alert' : 'status'}
+              className={`mt-4 rounded-md border px-4 py-3 text-sm ${
+                feedback.type === 'success'
+                  ? 'border-green-200 bg-green-50 text-green-800'
+                  : 'border-red-200 bg-red-50 text-red-700'
+              }`}
+            >
+              {feedback.message}
+              {feedback.type === 'success' && (
+                <Link to="/cart" className="ml-2 font-medium underline underline-offset-4">
+                  View bag
+                </Link>
+              )}
+            </div>
+          )}
+
+          {variants.length === 0 && (
+            <p className="mt-4 text-sm text-stone-500">
+              This piece has no purchasable options yet, so it cannot be added to your bag.
+            </p>
+          )}
         </div>
       </div>
     </div>

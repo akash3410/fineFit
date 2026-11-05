@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useCart } from '../features/cart/CartContext'
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Navbar — Gucci-inspired luxury navigation
@@ -25,6 +26,7 @@ const MENU_ITEMS = [
 export function Navbar() {
   const location = useLocation()
   const isHome = location.pathname === '/'
+  const { totalQuantity } = useCart()
 
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -154,8 +156,43 @@ export function Navbar() {
             </h1>
           </Link>
 
-          {/* ── Right: Search + Menu ── */}
+          {/* ── Right: Bag + Search + Menu ── */}
           <div className="flex items-center gap-5 w-[200px] justify-end">
+            {/* Cart link with a live bag counter sourced from the backend */}
+            <Link
+              to="/cart"
+              className={`relative ${iconColor} ${hoverColor} transition-colors`}
+              aria-label={
+                totalQuantity > 0
+                  ? `Shopping bag, ${totalQuantity} ${totalQuantity === 1 ? 'item' : 'items'}`
+                  : 'Shopping bag, empty'
+              }
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16 8a4 4 0 10-8 0M4.5 8h15l-1.2 11.1a2 2 0 01-2 1.9H7.7a2 2 0 01-2-1.9L4.5 8z"
+                />
+              </svg>
+              {totalQuantity > 0 && (
+                <span
+                  className={`absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium leading-none ${
+                    isTransparent ? 'bg-white text-stone-900' : 'bg-stone-900 text-white'
+                  }`}
+                >
+                  {totalQuantity > 99 ? '99+' : totalQuantity}
+                </span>
+              )}
+            </Link>
+
             {/* Search icon (UI-only, no functionality implemented) */}
             <button
               className={`${iconColor} ${hoverColor} transition-colors`}
@@ -274,6 +311,13 @@ export function Navbar() {
 
               {/* Divider + secondary links */}
               <div className="mt-10 pt-8 border-t border-stone-200">
+                <Link
+                  to="/orders"
+                  onClick={closeMenu}
+                  className="block py-2 text-sm text-stone-500 hover:text-stone-900 transition-colors"
+                >
+                  My Orders
+                </Link>
                 <Link
                   to="/"
                   onClick={closeMenu}

@@ -165,6 +165,42 @@ graph TD
   - `quantity`: `PositiveIntegerField`
   - `line_total`: `DecimalField(max_digits=10, decimal_places=2)`
 
+*Implementation notes* (`backend/apps/orders`):
+- Ownership is exactly one of `user` (authenticated customer) or `session_key`
+  (guest session), enforced by a database CHECK constraint. Every customer-facing
+  lookup filters by that owner server-side (`Order.objects.for_customer` /
+  `for_guest_session`); an order number alone never grants access.
+- `OrderService.place_order()` runs in a single transaction: it locks every
+  involved `StockRecord` in deterministic UUID order, re-validates variant/
+  product availability and prices server-side, writes the order plus immutable
+  `OrderItem` snapshots, deducts stock through `StockService` (reason
+  `ORDER_CHECKOUT`), syncs the `ProductVariant.stock` mirror, and clears the cart.
+- `payment_method` accepts `COD` only; no card data or gateway state is stored.
+- `OrderItem.returned_quantity` tracks line-level returns (constrained to
+  `<= quantity`); `OrderService.return_items()` restocks selected units with
+  `RETURN` ledger movements and marks the order `RETURNED` once every line is
+  fully returned. Cancelling or returning through the status form restocks only
+  the outstanding units, so no unit is ever restocked twice.
+- `OrderStatusChange` is an append-only audit trail (`previous_status`,
+  `new_status`, `changed_by`, `note`, `created_at`). Partial returns are logged
+  with `previous_status == new_status`. Staff actions are attributed to the
+  logged-in account; guest/system activity has a null `changed_by`.
+- `ReturnRequest` + `ReturnRequestItem` record a customer's *intent* to return
+  units from a **delivered** order (`POST /api/v1/orders/{order_number}/returns/`,
+  ownership-scoped). Requests validate per-line quantities against
+  `OrderItem.remaining_quantity` and allow a single open request per order;
+  they never move stock.
+- Staff approve or decline requests in the custom dashboard
+  (`OrderService.review_return_request`). Approval reuses
+  `OrderService.return_items()`, so the `RETURN` ledger movements,
+  `returned_quantity` updates and `OrderStatusChange` audit entry are identical
+  to a staff-recorded return; each request can be reviewed only once.
+- The order detail payload exposes `status_history` (audit entries without
+  staff identities), `return_requests` and `can_request_return`, which powers
+  the storefront tracking timeline at `/order/{order_number}` and the
+  "My orders" list at `/orders`.
+- `shipping_fee` is `0.00` until the shipping-fee decision (ADR list, item 2) is made.
+
 ---
 
 ## 3. Concurrency & Inventory Atomic Operations
@@ -239,7 +275,8 @@ def process_order_checkout(cart, checkout_data):
 ### Checkout & Orders
 - `POST /api/v1/orders/checkout/` - Submit order (Supports guest & registered; COD validation)
 - `GET /api/v1/orders/` - Customer order history
-- `GET /api/v1/orders/{order_number}/` - Specific order details (isolated by ownership or guest verification token)
+- `GET /api/v1/orders/{order_number}/` - Specific order details (isolated by ownership or guest verification token), including status history and return requests
+- `POST /api/v1/orders/{order_number}/returns/` - Request a return on a delivered order (owner-only; staff approve in the dashboard)
 
 ### Staff Dashboard Operations (`/api/v1/dashboard/`)
 - `GET /api/v1/dashboard/orders/` - Staff order list with status filters & search

@@ -1,0 +1,303 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Order {{ order.order_number }} - FineFit Admin{% endblock %}
+{% block page_title %}Order Details{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-1">{{ order.order_number }} {% include 'admin_panel/orders/_status.html' %}</h4>
+        <small class="text-muted">Placed {{ order.created_at|date:"d M Y, H:i" }} &middot; {{ order.get_payment_method_display }}</small>
+    </div>
+    <div>
+        <a href="{% url 'admin_panel:order_list' %}" class="btn btn-secondary btn-sm">Back to orders</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Items</h5>
+                {% if returned_units %}<small class="text-muted">{{ returned_units }} unit{{ returned_units|pluralize }} returned</small>{% endif %}
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th>SKU</th>
+                            <th>Size</th>
+                            <th>Colour</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-center">Qty</th>
+                            <th class="text-center">Returned</th>
+                            <th class="text-end">Line Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.product_title }}</td>
+                            <td>{{ item.variant_sku }}</td>
+                            <td>{{ item.size|default:"-" }}</td>
+                            <td>{{ item.color_name|default:"-" }}</td>
+                            <td class="text-end">&#2547;{{ item.unit_price }}</td>
+                            <td class="text-center">{{ item.quantity }}</td>
+                            <td class="text-center">
+                                {% if item.returned_quantity %}
+                                    <span class="badge bg-warning text-dark">{{ item.returned_quantity }}</span>
+                                {% else %}
+                                    <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">&#2547;{{ item.line_total }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8" class="text-center py-3">This order has no line items.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="7" class="text-end">Subtotal</td>
+                            <td class="text-end">&#2547;{{ order.subtotal }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="7" class="text-end">Delivery fee</td>
+                            <td class="text-end">&#2547;{{ order.shipping_fee }}</td>
+                        </tr>
+                        <tr>
+                            <th colspan="7" class="text-end">Total due on delivery</th>
+                            <th class="text-end">&#2547;{{ order.total }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        {% if can_return and returnable_items %}
+        <div class="card mb-3">
+            <div class="card-header bg-white"><h5 class="mb-0">Record a Return</h5></div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="return">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-3">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th>SKU</th>
+                                    <th class="text-center">Sold</th>
+                                    <th class="text-center">Already returned</th>
+                                    <th style="width: 140px;">Return now</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in returnable_items %}
+                                <tr>
+                                    <td>{{ item.product_title }}</td>
+                                    <td>{{ item.variant_sku }}</td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                    <td class="text-center">{{ item.returned_quantity }}</td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm"
+                                               name="return_qty_{{ item.pk }}" min="0"
+                                               max="{{ item.remaining_quantity }}" step="1" placeholder="0">
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mb-3">
+                        <label for="return_note" class="form-label">Reason (optional)</label>
+                        <input type="text" class="form-control" id="return_note" name="note" maxlength="255"
+                               placeholder="e.g. wrong size, damaged on arrival">
+                    </div>
+                    <button type="submit" class="btn btn-outline-warning">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Return units to stock
+                    </button>
+                    <div class="form-text">Returned units go back into inventory with a RETURN ledger movement. Returning every unit marks the order as returned.</div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if return_requests %}
+        <div class="card mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Customer Return Requests</h5>
+                {% if open_return_requests %}
+                    <span class="badge bg-warning text-dark">{{ open_return_requests|length }} awaiting review</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% for return_request in return_requests %}
+                <div class="border rounded p-3{% if not forloop.last %} mb-3{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            {% if return_request.status == 'REQUESTED' %}
+                                <span class="badge bg-warning text-dark">Requested</span>
+                            {% elif return_request.status == 'APPROVED' %}
+                                <span class="badge bg-success">Approved</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Declined</span>
+                            {% endif %}
+                            <small class="text-muted ms-2">
+                                {{ return_request.created_at|date:"d M Y, H:i" }}
+                                {% if return_request.requested_by %} by {{ return_request.requested_by.email }}{% else %} by a guest{% endif %}
+                            </small>
+                        </div>
+                        <small class="text-muted font-monospace">#{{ return_request.pk|stringformat:"s"|slice:":8" }}</small>
+                    </div>
+                    <ul class="small mb-2">
+                        {% for line in return_request.items.all %}
+                        <li>{{ line.quantity }} &times; {{ line.order_item.product_title }} ({{ line.order_item.variant_sku }})</li>
+                        {% endfor %}
+                    </ul>
+                    {% if return_request.reason %}
+                    <p class="small mb-2"><strong>Customer reason:</strong> {{ return_request.reason }}</p>
+                    {% endif %}
+                    {% if return_request.staff_note %}
+                    <p class="small text-muted mb-2">Staff note: {{ return_request.staff_note }}</p>
+                    {% endif %}
+
+                    {% if return_request.is_open %}
+                    <form method="post" class="row g-2 align-items-end">
+                        {% csrf_token %}
+                        <input type="hidden" name="return_request_id" value="{{ return_request.pk }}">
+                        <div class="col-md-6">
+                            <label class="form-label small" for="review_note_{{ forloop.counter }}">Note (optional)</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   id="review_note_{{ forloop.counter }}" name="note" maxlength="255"
+                                   placeholder="e.g. inspected, resellable">
+                        </div>
+                        <div class="col-md-6">
+                            <button type="submit" name="action" value="approve_return" class="btn btn-success btn-sm">
+                                <i class="bi bi-check2-circle me-1"></i> Approve &amp; restock
+                            </button>
+                            <button type="submit" name="action" value="decline_return" class="btn btn-outline-secondary btn-sm">
+                                Decline
+                            </button>
+                        </div>
+                    </form>
+                    <div class="form-text">Approving restocks exactly these units with a RETURN ledger movement. Each request can be reviewed once.</div>
+                    {% elif return_request.resolved_at %}
+                    <p class="small text-muted mb-0">
+                        Resolved {{ return_request.resolved_at|date:"d M Y, H:i" }}
+                        {% if return_request.resolved_by %} by {{ return_request.resolved_by.email }}{% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if order.notes %}
+        <div class="card mb-3">
+            <div class="card-header bg-white"><h5 class="mb-0">Customer Notes</h5></div>
+            <div class="card-body">{{ order.notes|linebreaksbr }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header bg-white"><h5 class="mb-0">Customer</h5></div>
+            <div class="card-body">
+                <p class="mb-1"><strong>{{ order.customer_name }}</strong></p>
+                <p class="mb-1">{{ order.customer_phone }}</p>
+                <p class="mb-1">{{ order.customer_email|default:"No email provided" }}</p>
+                <p class="mb-0 small text-muted">
+                    {% if order.user_id %}Registered customer{% else %}Guest checkout{% endif %}
+                </p>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header bg-white"><h5 class="mb-0">Delivery Address</h5></div>
+            <div class="card-body">
+                <p class="mb-0">
+                    {{ address.address_line1 }}<br>
+                    {% if address.address_line2 %}{{ address.address_line2 }}<br>{% endif %}
+                    {% if address.area %}{{ address.area }}<br>{% endif %}
+                    {{ address.city }}{% if address.postal_code %} - {{ address.postal_code }}{% endif %}<br>
+                    {{ address.country }}
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-white"><h5 class="mb-0">Update Status</h5></div>
+            <div class="card-body">
+                {% if is_terminal %}
+                    <p class="mb-0 text-muted">This order is {{ order.get_status_display|lower }}. Terminal orders cannot change status.</p>
+                {% else %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="status">
+                        <div class="mb-3">
+                            <label for="status" class="form-label">New status</label>
+                            <select name="status" id="status" class="form-select" required>
+                                {% for value, label in statuses %}
+                                    <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="status_note" class="form-label">Note (optional)</label>
+                            <input type="text" class="form-control" id="status_note" name="note" maxlength="255"
+                                   placeholder="Recorded in the audit trail">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Save Status</button>
+                        <div class="form-text">Cancelling or returning an order puts its outstanding units back into stock.</div>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header bg-white"><h5 class="mb-0">Status &amp; Return History</h5></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>When</th>
+                        <th>Change</th>
+                        <th>Note</th>
+                        <th>By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for change in status_changes %}
+                    <tr>
+                        <td class="small">{{ change.created_at|date:"d M Y, H:i" }}</td>
+                        <td>
+                            {% if change.is_status_transition %}
+                                {{ change.get_previous_status_display|default:"New" }} &rarr; {{ change.get_new_status_display }}
+                            {% else %}
+                                <span class="text-muted">No status change</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">{{ change.note|default:"-" }}</td>
+                        <td class="small">
+                            {% if change.changed_by %}{{ change.changed_by.email }}{% else %}System / guest{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-3 text-muted">
+                            No status changes recorded yet. Placed {{ order.created_at|date:"d M Y, H:i" }}.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

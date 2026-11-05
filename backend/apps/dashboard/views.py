@@ -4,6 +4,7 @@ from django.shortcuts import render
 from django.db.models import Count, Sum, F
 from apps.catalog.models import Category, Product, ProductVariant, Subcategory, ProductImage
 from apps.inventory.models import StockRecord
+from apps.orders.models import Order, OrderStatus
 
 
 def dashboard_view(request):
@@ -85,8 +86,14 @@ def get_dashboard_context():
     
     # Recently added products
     recent_products = Product.objects.filter(is_deleted=False).order_by('-created_at')[:10]
+
+    # Order stats
+    total_orders = Order.objects.count()
+    pending_orders = Order.objects.filter(status=OrderStatus.PENDING).count()
     
     return {
+        'total_orders': total_orders,
+        'pending_orders': pending_orders,
         'total_categories': total_categories,
         'total_subcategories': total_subcategories,
         'total_products': total_products,

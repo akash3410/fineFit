@@ -42,6 +42,10 @@ export interface ProductVariant {
   color_code: string;
   is_active: boolean;
   effective_price: string | null;
+  /** Derived server-side from the inventory source of truth. */
+  is_in_stock?: boolean;
+  is_low_stock?: boolean;
+  stock_status?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
 }
 
 export interface ProductListItem {

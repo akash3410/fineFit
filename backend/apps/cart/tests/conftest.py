@@ -53,7 +53,7 @@ def product(db, category):
         category=category,
         title="Silk Slip Dress",
         slug="silk-slip-dress",
-        base_price="120.00",
+        price="120.00",
         is_published=True,
     )
 
@@ -64,7 +64,7 @@ def draft_product(db, category):
         category=category,
         title="Secret Draft Dress",
         slug="secret-draft-dress",
-        base_price="99.00",
+        price="99.00",
         is_published=False,
     )
 

@@ -12,8 +12,9 @@
  * reveal with a staggered fade-up the first time the section scrolls into
  * view, and re-animate on every page change.
  *
- * Note: the storefront has no cart UI or cart write client yet, so the quick
- * actions route into the product page where a size/variant is chosen.
+ * Note: a size/variant must be chosen before an item can enter the bag, so the
+ * quick actions route into the product page where the shopper picks one and
+ * adds it to the (server-backed) cart.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";

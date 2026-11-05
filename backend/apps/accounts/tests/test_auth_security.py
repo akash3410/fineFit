@@ -213,7 +213,7 @@ class TestJWTAuth:
             email="jwt@finefit.store", password="StrongPass123!"
         )
         response = client.post(
-            "/api/v1/token/",
+            "/api/v1/auth/token/",
             {"email": "jwt@finefit.store", "password": "StrongPass123!"},
             content_type="application/json",
         )
@@ -228,7 +228,7 @@ class TestJWTAuth:
             email="jwt2@finefit.store", password="StrongPass123!"
         )
         response = client.post(
-            "/api/v1/token/",
+            "/api/v1/auth/token/",
             {"email": "jwt2@finefit.store", "password": "WrongPass!"},
             content_type="application/json",
         )
@@ -241,14 +241,14 @@ class TestJWTAuth:
         )
         # Obtain tokens
         resp = client.post(
-            "/api/v1/token/",
+            "/api/v1/auth/token/",
             {"email": "jwt3@finefit.store", "password": "StrongPass123!"},
             content_type="application/json",
         )
         refresh = resp.json()["refresh"]
         # Refresh
         response = client.post(
-            "/api/v1/token/refresh/",
+            "/api/v1/auth/token/refresh/",
             {"refresh": refresh},
             content_type="application/json",
         )
@@ -261,7 +261,7 @@ class TestJWTAuth:
             email="jwt4@finefit.store", password="StrongPass123!"
         )
         resp = client.post(
-            "/api/v1/token/",
+            "/api/v1/auth/token/",
             {"email": "jwt4@finefit.store", "password": "StrongPass123!"},
             content_type="application/json",
         )
@@ -269,7 +269,7 @@ class TestJWTAuth:
         # Blacklist
         client.force_login(user)
         response = client.post(
-            "/api/v1/token/blacklist/",
+            "/api/v1/auth/token/blacklist/",
             {"refresh": refresh},
             content_type="application/json",
         )

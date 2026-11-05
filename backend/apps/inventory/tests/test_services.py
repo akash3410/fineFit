@@ -235,3 +235,66 @@ class TestStockServiceSetLevelAndBatchLock:
         assert locked[variant.id].id == stock_record.id
         assert locked[variant_two.id].id == record_two.id
 
+
+
+@pytest.mark.django_db
+class TestStockServiceCatalogSync:
+    """``sync_declared_stock`` bridges catalog-declared stock into the ledger.
+
+    The staff dashboard stores stock on ``ProductVariant.stock`` while cart
+    availability is owned by ``StockRecord``; the bridge must create the record
+    when it is missing and correct it when the two disagree.
+    """
+
+    def test_creates_missing_record_with_initial_stock_movement(self, variant, regular_user):
+        record = StockService.sync_declared_stock(
+            variant, 12, actor=regular_user, notes="Backfilled from catalog"
+        )
+
+        assert record.quantity_on_hand == 12
+        assert record.available_quantity == 12
+
+        movement = StockMovement.objects.get(stock_record=record)
+        assert movement.reason == MovementReason.INITIAL_STOCK
+        assert movement.quantity_delta == 12
+        assert movement.actor == regular_user
+        assert movement.notes == "Backfilled from catalog"
+
+    def test_creates_record_for_zero_declared_stock(self, variant):
+        record = StockService.sync_declared_stock(variant, 0)
+
+        assert record.quantity_on_hand == 0
+        assert record.available_quantity == 0
+
+    def test_is_noop_when_quantities_already_match(self, stock_record):
+        movements_before = StockMovement.objects.count()
+
+        record = StockService.sync_declared_stock(
+            stock_record.variant, stock_record.quantity_on_hand
+        )
+
+        assert record.pk == stock_record.pk
+        assert StockMovement.objects.count() == movements_before
+
+    def test_corrects_differing_quantity_with_correction_movement(self, stock_record):
+        record = StockService.sync_declared_stock(stock_record.variant, 42)
+
+        record.refresh_from_db()
+        assert record.quantity_on_hand == 42
+
+        movement = StockMovement.objects.latest("created_at")
+        assert movement.reason == MovementReason.CORRECTION
+        assert movement.quantity_delta == 22
+
+    def test_rejects_negative_quantity(self, variant):
+        with pytest.raises(InvalidStockAdjustmentError):
+            StockService.sync_declared_stock(variant, -1)
+
+        assert not StockRecord.objects.filter(variant=variant).exists()
+
+    def test_rejects_quantity_below_reserved_units(self, stock_record):
+        with pytest.raises(InvalidStockAdjustmentError):
+            StockService.sync_declared_stock(stock_record.variant, 3)
+
+        stock_record.refresh_from_db()
+        assert stock_record.quantity_on_hand == 20

@@ -392,6 +392,57 @@ class StockService:
 
     @classmethod
     @transaction.atomic
+    def sync_declared_stock(
+        cls,
+        variant_or_id: ProductVariant | uuid.UUID | str,
+        declared_quantity: int,
+        actor=None,
+        notes: str = "",
+    ) -> StockRecord:
+        """
+        Align a variant's StockRecord with a quantity declared on the catalog side.
+
+        The staff dashboard edits ``ProductVariant.stock``, while inventory (and
+        therefore cart availability) is owned by ``StockRecord``. Without this
+        bridge a variant can look purchasable on the storefront yet be rejected
+        as unavailable by the cart because no stock record exists.
+
+        Missing records are created with an INITIAL_STOCK movement; differing
+        quantities are corrected through a ledgered CORRECTION movement.
+        """
+        if not isinstance(declared_quantity, int) or declared_quantity < 0:
+            raise InvalidStockAdjustmentError(
+                "Declared stock must be a non-negative integer."
+            )
+
+        variant_id = cls._resolve_variant_id(variant_or_id)
+        record = (
+            StockRecord.objects.select_for_update()
+            .filter(variant_id=variant_id)
+            .first()
+        )
+
+        if record is None:
+            return cls.create_stock_record(
+                variant_or_id=variant_id,
+                quantity_on_hand=declared_quantity,
+                actor=actor,
+                reason=MovementReason.INITIAL_STOCK,
+                notes=notes or "Initial stock established from catalog variant stock.",
+            )
+
+        if record.quantity_on_hand == declared_quantity:
+            return record
+
+        return cls.set_stock_level(
+            variant_or_id=variant_id,
+            new_quantity_on_hand=declared_quantity,
+            actor=actor,
+            notes=notes or "Stock level synced from catalog variant stock.",
+        )
+
+    @classmethod
+    @transaction.atomic
     def lock_stock_records(
         cls, variant_ids: Sequence[uuid.UUID | str]
     ) -> dict[uuid.UUID, StockRecord]:

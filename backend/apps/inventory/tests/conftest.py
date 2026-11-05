@@ -90,7 +90,7 @@ def product(db, category):
         title="Silk Slip Dress",
         slug="silk-slip-dress",
         category=category,
-        base_price=Decimal("120.00"),
+        price=Decimal("120.00"),
         is_published=True,
     )
 

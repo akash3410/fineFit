@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import admin_user_views
+from . import order_views
 from . import role_views
 from apps.accounts import views as accounts_views
 
@@ -69,6 +70,10 @@ urlpatterns = [
     path("events/<int:pk>/view/", views.event_view, name="event_view"),
     path("events/<int:pk>/edit/", views.event_edit, name="event_edit"),
     path("events/<int:pk>/delete/", views.event_delete, name="event_delete"),
+
+    # Orders
+    path("orders/", order_views.order_list, name="order_list"),
+    path("orders/<str:order_number>/", order_views.order_view, name="order_view"),
 
     # AJAX endpoints
     path("api/subcategories/<int:category_id>/", views.get_subcategories_ajax, name="get_subcategories_ajax"),

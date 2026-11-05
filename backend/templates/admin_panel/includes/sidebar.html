@@ -28,6 +28,11 @@
                 <i class="bi bi-box-seam me-2"></i> Products
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link text-white {% if request.resolver_match.url_name == 'order_list' or request.resolver_match.url_name == 'order_view' %}active{% endif %}" href="{% url 'admin_panel:order_list' %}">
+                <i class="bi bi-bag-check me-2"></i> Orders
+            </a>
+        </li>
         {% if request.user.is_superuser %}
         <li class="nav-item mt-3">
             <span class="nav-link text-white small text-uppercase">User Management</span>

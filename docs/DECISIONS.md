@@ -112,6 +112,42 @@ This document records the rationale behind key technical choices, trade-offs eva
 
 ---
 
+### ADR-011: Cash-on-Delivery Checkout in `apps.orders`
+- **Status**: Accepted
+- **Context**: The storefront bag had no way to become an order. The platform needs a first, straightforward purchase path before payment gateways are evaluated, and the COD decision (see unresolved decision 4 for returns) is a prerequisite for any gateway integration.
+- **Decision**: Implement `apps.orders` with `Order` + `OrderItem` exactly as specified in ARCHITECTURE.md §2.5, supporting **cash on delivery only** (`payment_method='COD'`). Checkout is a single atomic transaction that locks the cart's `StockRecord`s in deterministic UUID order, re-validates catalog visibility, prices and stock server-side, snapshots line items (title/SKU/size/colour/unit price), deducts stock via `StockService` with `ORDER_CHECKOUT` ledger movements, and clears the cart. Guest orders are bound to the Django session key; authenticated orders to the customer. Order lookups always filter by owner. `shipping_fee` is stored as `0.00` until the shipping-fee policy is decided.
+- **Consequences**:
+  - *Positive*: Real orders can be placed today with no third-party dependency, no card data in scope, an immutable audit trail of every sale, and no overselling race (row locks + availability re-check).
+  - *Trade-off*: Staff must confirm/fulfil orders manually; adding a payment gateway later requires a payment-state model rather than a schema change to `Order`. Until shipping-fee policy is set, the storefront shows no delivery charge and the total equals the subtotal.
+
+---
+
+### ADR-012: Staff Order Management in the Custom Admin Panel
+- **Status**: Accepted
+- **Context**: Orders placed by guests are attached to a browser session, so staff had no way to find them in the custom dashboard; only Django admin exposed the raw rows. Fulfilment also needs a safe way to cancel an order without losing the sold units.
+- **Decision**: Add an **Orders** section to the custom admin panel (`/admin/orders/`) with status/search filters, a detail page showing customer, delivery address, line snapshots and totals, and a status form. All status changes go through `OrderService.update_status()`, which locks the order and its stock records, and **returns the outstanding units to stock** through `StockService` (`ORDER_CANCELLED` / `RETURN` movements) when an order is cancelled or returned. `CANCELLED` and `RETURNED` are terminal: they cannot be reopened, which guarantees stock is restored exactly once.
+- **Audit trail**: Every status transition writes an append-only `OrderStatusChange` row (`previous_status`, `new_status`, `changed_by`, `note`, `created_at`), shown as *Status & Return History* on the order page. Staff actions record the logged-in account; guest/system activity has a null actor.
+- **Line-level returns**: `OrderItem.returned_quantity` (DB-constrained to `<= quantity`) plus `OrderService.return_items()` let staff return individual units per line with an optional reason. Returns are allowed only after confirmation (`CONFIRMED`…`DELIVERED`), restock exactly the returned units, and mark the order `RETURNED` once every line is fully returned. Cancellation restocks only outstanding units, so a partially returned order is never restocked twice.
+- **Consequences**:
+  - *Positive*: Staff can see and action every order regardless of guest/registered ownership, inventory stays consistent with sales, cancellations and partial returns, and every status/return event is attributable to a dated actor.
+  - *Trade-off*: Returns are restocked straight into available stock (no per-unit condition grading, refund accounting or damaged-vs-resellable split); those belong with the unresolved refund policy (decision 4).
+
+---
+
+### ADR-013: Customer Return Requests & Order Tracking
+- **Status**: Accepted
+- **Context**: Returns existed only as a staff action in the dashboard. Customers had no order history page and no way to see what happened to an order, so every return had to be arranged by phone or message and staff had to re-key the request.
+- **Decision**: Add a customer-facing return-request flow plus order tracking:
+  - `ReturnRequest` (+`ReturnRequestItem`) records per-line quantities a customer wants to return, with an optional reason. `POST /api/v1/orders/{order_number}/returns/` is ownership-scoped exactly like order lookup (guest session or `user=request.user`, 404 otherwise) and only accepts **delivered** orders, at most one open request per order, and quantities within `OrderItem.remaining_quantity`.
+  - A request is **intent, not stock movement**: units only return to inventory when staff approve, because the goods must physically arrive first.
+  - Staff review requests on the dashboard order page (`approve_return` / `decline_return`). `OrderService.review_return_request()` delegates approval to `OrderService.return_items()`, so restocking, `RETURN` ledger movements, the `returned_quantity` update and the audit entry are identical to a staff-recorded return. A request can be reviewed exactly once; declines store a staff note.
+  - Order detail now returns `status_history` (audit entries with staff identities stripped), `return_requests` and `can_request_return`. The storefront renders a tracking timeline, the request statuses and the per-line return form on `/order/{order_number}`, and lists every owned order at `/orders`.
+- **Consequences**:
+  - *Positive*: Customers can self-serve returns and track progress without contacting staff; staff get a reviewed, attributable record instead of verbal requests; stock still only changes on approval, so inventory cannot be inflated by an unapproved claim.
+  - *Trade-off*: There is no customer-facing cancel of a pending request and no automatic expiry window; refunds remain out of scope until the COD refund policy (decision 4) is settled.
+
+---
+
 ## 2. Unresolved Business Decisions (Client Clarification Needed)
 
 The following items are documented as open decisions and must not be assumed without client/stakeholder agreement:
