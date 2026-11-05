@@ -20,6 +20,8 @@ router.register(r"images", views.ManageImageViewSet, basename="manage-image")
 urlpatterns = [
     # Public storefront reads
     path("categories/", views.CategoryListView.as_view(), name="category-list"),
+    path("subcategories/", views.SubcategoryListView.as_view(), name="subcategory-list"),
+    path("events/", views.EventListView.as_view(), name="event-list"),
     path("products/", views.ProductListView.as_view(), name="product-list"),
     path("products/<slug:slug>/", views.ProductDetailView.as_view(), name="product-detail"),
     # Staff management (model-permission gated)

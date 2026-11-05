@@ -1,9 +1,28 @@
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 export interface Category {
   id: number;
   name: string;
   slug: string;
   is_active: boolean;
+  image?: string | null;
   children: Category[];
+}
+
+export interface Subcategory {
+  id: number;
+  name: string;
+  slug: string;
+  image?: string | null;
+  is_active: boolean;
+  category: number;
+  category_name: string;
+  category_slug?: string | null;
 }
 
 export interface ProductImage {
@@ -30,8 +49,24 @@ export interface ProductListItem {
   slug: string;
   title: string;
   base_price: string;
+  discount_price?: string | null;
+  stock?: number;
   category: string;
   primary_image: ProductImage | null;
+  created_at: string;
+}
+
+export interface Event {
+  id: number;
+  slug: string;
+  title: string;
+  announcement: string;
+  image?: string | null;
+  start_at: string;
+  end_at: string | null;
+  is_active: boolean;
+  cta_label: string;
+  cta_link: string;
   created_at: string;
 }
 

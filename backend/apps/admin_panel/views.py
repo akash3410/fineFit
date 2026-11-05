@@ -10,7 +10,7 @@ from django.views.decorators.http import require_http_methods
 
 from .decorators import admin_access_required, superuser_required
 
-from apps.catalog.models import Category, Subcategory, Product, ProductVariant, ProductImage
+from apps.catalog.models import Category, Subcategory, Product, ProductVariant, ProductImage, Event
 from apps.dashboard.views import get_dashboard_context
 
 
@@ -469,6 +469,114 @@ def product_delete(request, pk):
     product.save()
     messages.success(request, 'Product deleted successfully.')
     return redirect('admin_panel:product_list')
+
+
+@user_passes_test(admin_access_required)
+def event_list(request):
+    queryset = Event.objects.filter(is_deleted=False).order_by('-created_at')
+    search = request.GET.get('q', '')
+    if search:
+        queryset = queryset.filter(Q(title__icontains=search) | Q(slug__icontains=search))
+    paginator = Paginator(queryset, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'admin_panel/events/index.html', {
+        'page_obj': page_obj,
+        'search': search,
+    })
+
+
+@user_passes_test(admin_access_required)
+def event_add(request):
+    if request.method == 'POST':
+        title = request.POST.get('title', '').strip()
+        slug = request.POST.get('slug', '').strip()
+        announcement = request.POST.get('announcement', '').strip()
+        is_active = request.POST.get('is_active') == 'on'
+        start_at = request.POST.get('start_at', '').strip()
+        end_at = request.POST.get('end_at', '').strip()
+        cta_label = request.POST.get('cta_label', '').strip() or 'Explore Event'
+        cta_link = request.POST.get('cta_link', '').strip()
+        if not slug:
+            from django.utils.text import slugify
+            slug = slugify(title)
+        if not title or not start_at or not end_at:
+            messages.error(request, 'Title, start date and end date are required.')
+        elif Event.objects.filter(slug=slug).exists():
+            messages.error(request, 'Slug already exists.')
+        else:
+            event = Event.objects.create(
+                title=title,
+                slug=slug,
+                announcement=announcement,
+                is_active=is_active,
+                start_at=start_at,
+                end_at=end_at,
+                cta_label=cta_label,
+                cta_link=cta_link or None,
+            )
+            if request.FILES.get('image'):
+                event.image = request.FILES['image']
+                event.save(update_fields=['image'])
+            messages.success(request, 'Event created successfully.')
+            return redirect('admin_panel:event_list')
+    return render(request, 'admin_panel/events/form.html', {'action': 'Add'})
+
+
+@user_passes_test(admin_access_required)
+def event_view(request, pk):
+    event = get_object_or_404(Event, pk=pk, is_deleted=False)
+    return render(request, 'admin_panel/events/view.html', {
+        'event': event,
+    })
+
+
+@user_passes_test(admin_access_required)
+def event_edit(request, pk):
+    event = get_object_or_404(Event, pk=pk, is_deleted=False)
+    if request.method == 'POST':
+        title = request.POST.get('title', '').strip()
+        slug = request.POST.get('slug', '').strip()
+        announcement = request.POST.get('announcement', '').strip()
+        is_active = request.POST.get('is_active') == 'on'
+        start_at = request.POST.get('start_at', '').strip()
+        end_at = request.POST.get('end_at', '').strip()
+        cta_label = request.POST.get('cta_label', '').strip() or 'Explore Event'
+        cta_link = request.POST.get('cta_link', '').strip()
+        if not slug:
+            from django.utils.text import slugify
+            slug = slugify(title)
+        if not title or not start_at or not end_at:
+            messages.error(request, 'Title, start date and end date are required.')
+        elif Event.objects.filter(slug=slug).exclude(pk=pk).exists():
+            messages.error(request, 'Slug already exists.')
+        else:
+            event.title = title
+            event.slug = slug
+            event.announcement = announcement
+            event.is_active = is_active
+            event.start_at = start_at
+            event.end_at = end_at
+            event.cta_label = cta_label
+            event.cta_link = cta_link or None
+            if request.FILES.get('image'):
+                event.image = request.FILES['image']
+            elif request.POST.get('clear_image') == 'on':
+                event.image = None
+            event.save()
+            messages.success(request, 'Event updated successfully.')
+            return redirect('admin_panel:event_list')
+    return render(request, 'admin_panel/events/form.html', {'event': event, 'action': 'Edit'})
+
+
+@user_passes_test(admin_access_required)
+@require_http_methods(["POST"])
+def event_delete(request, pk):
+    event = get_object_or_404(Event, pk=pk, is_deleted=False)
+    event.is_deleted = True
+    event.deleted_at = timezone.now()
+    event.save()
+    messages.success(request, 'Event deleted successfully.')
+    return redirect('admin_panel:event_list')
 
 
 @user_passes_test(admin_access_required)

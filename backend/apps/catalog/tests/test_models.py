@@ -54,17 +54,17 @@ class TestProduct:
         assert product.pk is not None
         assert str(product) == "Aurora Wool Overcoat"
 
-    def test_base_price_negative_rejected(self, category):
-        product = Product(category=category, title="Bad", slug="bad", base_price="-1.00")
+    def test_price_negative_rejected(self, category):
+        product = Product(category=category, title="Bad", slug="bad", price="-1.00")
         with pytest.raises(ValidationError) as exc:
             product.full_clean()
-        assert "base_price" in exc.value.error_dict
+        assert "price" in exc.value.error_dict
 
-    def test_db_rejects_negative_base_price(self, category):
+    def test_db_rejects_negative_price(self, category):
         with transaction.atomic():
             with pytest.raises(IntegrityError):
                 Product.objects.create(
-                    category=category, title="Bad", slug="bad-db", base_price="-5.00"
+                    category=category, title="Bad", slug="bad-db", price="-5.00"
                 )
 
     def test_published_queryset_hides_drafts_and_inactive(self, product, draft_product, product_in_inactive_category):
@@ -76,7 +76,7 @@ class TestProduct:
     def test_slug_unique_at_db(self, product, category):
         with pytest.raises(IntegrityError):
             Product.objects.create(
-                category=category, title="Dup", slug="aurora-wool-overcoat", base_price="1.00"
+                category=category, title="Dup", slug="aurora-wool-overcoat", price="1.00"
             )
 
 
@@ -86,7 +86,7 @@ class TestProductVariant:
             ProductVariant.objects.create(product=product, sku="AURORA-M-BLK")
 
     def test_effective_price_falls_back_to_base(self, product, variant):
-        assert variant.effective_price == product.base_price
+        assert variant.effective_price == product.price
 
     def test_effective_price_uses_override(self, product):
         v = ProductVariant.objects.create(
@@ -145,7 +145,7 @@ class TestProductImage:
 
     def test_variant_must_belong_to_product(self, product, variant):
         other = Product.objects.create(
-            category=product.category, title="Other", slug="other", base_price="10.00"
+            category=product.category, title="Other", slug="other", price="10.00"
         )
         img = ProductImage(product=other, image="x.png", variant=variant)
         with pytest.raises(ValidationError) as exc:

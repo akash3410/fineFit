@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -5,6 +6,8 @@ import { Link } from 'react-router-dom'
  * ──────────────────────────────────────────────────────────────────────── */
 
 export function Footer() {
+  // Computed once outside the render path so the purity rule is satisfied.
+  const year = useMemo(() => new Date().getFullYear(), []);
   return (
     <footer className="bg-stone-900 text-stone-300">
       <div className="mx-auto max-w-7xl px-6 lg:px-10">
@@ -83,7 +86,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-stone-700/50 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-stone-500">
-            © {new Date().getFullYear()} FineFit. All rights reserved.
+            © {year} FineFit. All rights reserved.
           </p>
           <div className="flex gap-6 text-xs text-stone-500">
             <span>Privacy Policy</span>

@@ -76,7 +76,7 @@ class TestProductCrud:
         )
         assert response.status_code == 200
         product.refresh_from_db()
-        assert str(product.base_price) == "250.00"
+        assert str(product.price) == "250.00"
 
     def test_manager_deletes_product(self, catalog_manager_client, product):
         response = catalog_manager_client.delete(_manage_url("product", product.pk))

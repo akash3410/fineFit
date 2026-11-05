@@ -3,12 +3,13 @@ Catalog domain models for the FineFit E-Commerce platform.
 
 Domain boundary note — Inventory
 --------------------------------
-``ProductVariant`` deliberately carries NO stock quantity / inventory fields.
-Stock levels are owned by the separate ``apps.inventory`` application
-(``StockRecord``), which references a variant via a one-to-one relationship
-through the reverse accessor ``variant.stock_record``. This keeps stock
-mutation, reservation, and atomic locking concerns isolated from the read-mostly
-catalog domain. Catalog exposes only variant *attributes* (size, colour, price).
+``ProductVariant`` carries its own ``stock`` quantity for admin convenience,
+while the separate ``apps.inventory`` application owns reservation, movement,
+and atomic locking concerns through its ``StockRecord`` (referencing a variant
+via a one-to-one relationship, reverse accessor ``variant.stock_record``).
+Catalog read APIs fall back to the variant's own stock when no ``StockRecord``
+exists yet. Catalog exposes only variant *attributes* plus derived stock
+status; stock mutation stays isolated in ``apps.inventory``.
 
 Primary key strategy (per docs/ARCHITECTURE.md §2.2):
   - ``Category``       -> BigAutoField (public taxonomy, non-sensitive)
@@ -671,3 +672,100 @@ class ProductImage(models.Model):
                 raise ValidationError(
                     {"variant": _("The selected variant does not belong to this product.")}
                 )
+
+
+class EventQuerySet(models.QuerySet):
+    """Queryset helpers for public events."""
+
+    def active(self):
+        """Events that are active and currently within their date window."""
+        now = timezone.now()
+        return self.filter(
+            is_active=True,
+            is_deleted=False,
+            start_at__lte=now,
+            end_at__gte=now,
+        )
+
+
+class Event(models.Model):
+    """
+    A promotional event or announcement shown on the storefront.
+
+    Only active events within their start/end date window are public.
+    """
+
+    title = models.CharField(_("title"), max_length=200)
+    slug = models.SlugField(_("slug"), max_length=255, unique=True)
+    announcement = models.TextField(_("announcement"), blank=True)
+    image = models.ImageField(
+        _("image"),
+        upload_to="catalog/events/%Y/%m/%d/",
+        blank=True,
+        null=True,
+        help_text=_("Optional event thumbnail."),
+    )
+    start_at = models.DateTimeField(_("start at"), help_text=_("When the event becomes visible."))
+    end_at = models.DateTimeField(
+        _("end at"),
+        help_text=_("When the event stops being visible."),
+    )
+    is_active = models.BooleanField(
+        _("active"),
+        default=True,
+        help_text=_("Inactive events are hidden from the public storefront."),
+    )
+    is_deleted = models.BooleanField(_("deleted"), default=False)
+    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    cta_label = models.CharField(
+        _("cta label"),
+        max_length=100,
+        default="Explore Event",
+        help_text=_("Label for the event call-to-action button."),
+    )
+    cta_link = models.URLField(
+        _("cta link"),
+        blank=True,
+        help_text=_("Destination URL when the CTA is tapped."),
+    )
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    objects = EventQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _("event")
+        verbose_name_plural = _("events")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["is_active", "start_at", "end_at"],
+                name="event_active_date_range_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(end_at__gt=models.F("start_at")),
+                name="event_end_after_start",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def clean(self):
+        super().clean()
+        if self.end_at and self.start_at and self.end_at <= self.start_at:
+            raise ValidationError(
+                {"end_at": _("End time must be after the start time.")}
+            )
+
+    def soft_delete(self):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
+    def restore(self):
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save(update_fields=["is_deleted", "deleted_at"])

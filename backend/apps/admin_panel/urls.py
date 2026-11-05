@@ -62,7 +62,14 @@ urlpatterns = [
     path("products/<uuid:pk>/view/", views.product_view, name="product_view"),
     path("products/<uuid:pk>/edit/", views.product_edit, name="product_edit"),
     path("products/<uuid:pk>/delete/", views.product_delete, name="product_delete"),
-    
+
+    # Events
+    path("events/", views.event_list, name="event_list"),
+    path("events/add/", views.event_add, name="event_add"),
+    path("events/<int:pk>/view/", views.event_view, name="event_view"),
+    path("events/<int:pk>/edit/", views.event_edit, name="event_edit"),
+    path("events/<int:pk>/delete/", views.event_delete, name="event_delete"),
+
     # AJAX endpoints
     path("api/subcategories/<int:category_id>/", views.get_subcategories_ajax, name="get_subcategories_ajax"),
     path("subcategories/api/<int:category_id>/", views.get_subcategories_ajax, name="get_subcategories_ajax_alt"),

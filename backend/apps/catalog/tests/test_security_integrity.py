@@ -38,7 +38,7 @@ class TestNestedVariantParentAssignment:
         self, catalog_manager_client, category
     ):
         other = Product.objects.create(
-            category=category, title="Other", slug="other", base_price="50.00"
+            category=category, title="Other", slug="other", price="50.00"
         )
         payload = {
             "category": category.pk,
@@ -129,10 +129,10 @@ class TestAuthorizationExtended:
 class TestUnpublishedIsolationExtended:
     def test_draft_excluded_from_search_and_filters(self, anon_client, category):
         draft = Product.objects.create(
-            category=category, title="Draft Search", slug="draft-search", base_price="10.00", is_published=False
+            category=category, title="Draft Search", slug="draft-search", price="10.00", is_published=False
         )
         published = Product.objects.create(
-            category=category, title="Published Search", slug="published-search", base_price="10.00", is_published=True
+            category=category, title="Published Search", slug="published-search", price="10.00", is_published=True
         )
         response = anon_client.get(reverse("product-list"), {"search": "Search"})
         slugs = [p["slug"] for p in response.data["results"]]

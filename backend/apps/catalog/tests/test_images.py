@@ -79,7 +79,7 @@ class TestPrimaryImageRule:
         from apps.catalog.models import Product
 
         other = Product.objects.create(
-            category=category, title="Another", slug="another", base_price="10.00"
+            category=category, title="Another", slug="another", price="10.00"
         )
         r1 = catalog_manager_client.post(
             _manage_images_url(), {"product": product.pk, "image": make_image_file("a"), "is_primary": "true"}
@@ -138,7 +138,7 @@ class TestImageVariantRelationship:
         from apps.catalog.models import Product
 
         other = Product.objects.create(
-            category=product.category, title="Other", slug="other-img", base_price="10.00"
+            category=product.category, title="Other", slug="other-img", price="10.00"
         )
         response = catalog_manager_client.post(
             _manage_images_url(),

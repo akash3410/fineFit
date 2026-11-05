@@ -67,16 +67,16 @@ class Command(BaseCommand):
 
             # Create products
             products_data = [
-                {"title": "Aurora Wool Overcoat", "slug": "aurora-wool-overcoat", "description": "Classic wool overcoat.", "base_price": Decimal("8999.99"), "category_slug": "outerwear", "is_published": True},
-                {"title": "Luna Cotton T-Shirt", "slug": "luna-cotton-t-shirt", "description": "Soft organic cotton t-shirt.", "base_price": Decimal("1299.99"), "category_slug": "tops", "is_published": True},
-                {"title": "Nova Denim Jeans", "slug": "nova-denim-jeans", "description": "High-waisted straight-leg denim jeans.", "base_price": Decimal("3499.99"), "category_slug": "bottoms", "is_published": True},
-                {"title": "Stella Silk Blouse", "slug": "stella-silk-blouse", "description": "Luxurious silk blouse.", "base_price": Decimal("4999.99"), "category_slug": "tops", "is_published": True},
-                {"title": "Atlas Chino Pants", "slug": "atlas-chino-pants", "description": "Versatile chino pants.", "base_price": Decimal("2799.99"), "category_slug": "men", "is_published": True},
-                {"title": "Mila Knit Sweater", "slug": "mila-knit-sweater", "description": "Cozy oversized knit sweater.", "base_price": Decimal("3799.99"), "category_slug": "tops", "is_published": True},
-                {"title": "Orion Leather Jacket", "slug": "orion-leather-jacket", "description": "Genuine leather jacket.", "base_price": Decimal("12999.99"), "category_slug": "outerwear", "is_published": True},
-                {"title": "Cora Midi Skirt", "slug": "cora-midi-skirt", "description": "Elegant midi skirt.", "base_price": Decimal("2999.99"), "category_slug": "bottoms", "is_published": True},
-                {"title": "Phoenix Polo Shirt", "slug": "phoenix-polo-shirt", "description": "Classic pique polo shirt.", "base_price": Decimal("1999.99"), "category_slug": "men", "is_published": True},
-                {"title": "Vera Linen Dress", "slug": "vera-linen-dress", "description": "Breathable linen dress.", "base_price": Decimal("4499.99"), "category_slug": "women", "is_published": True},
+                {"title": "Aurora Wool Overcoat", "slug": "aurora-wool-overcoat", "description": "Classic wool overcoat.", "price": Decimal("8999.99"), "category_slug": "outerwear", "is_published": True},
+                {"title": "Luna Cotton T-Shirt", "slug": "luna-cotton-t-shirt", "description": "Soft organic cotton t-shirt.", "price": Decimal("1299.99"), "category_slug": "tops", "is_published": True},
+                {"title": "Nova Denim Jeans", "slug": "nova-denim-jeans", "description": "High-waisted straight-leg denim jeans.", "price": Decimal("3499.99"), "category_slug": "bottoms", "is_published": True},
+                {"title": "Stella Silk Blouse", "slug": "stella-silk-blouse", "description": "Luxurious silk blouse.", "price": Decimal("4999.99"), "category_slug": "tops", "is_published": True},
+                {"title": "Atlas Chino Pants", "slug": "atlas-chino-pants", "description": "Versatile chino pants.", "price": Decimal("2799.99"), "category_slug": "men", "is_published": True},
+                {"title": "Mila Knit Sweater", "slug": "mila-knit-sweater", "description": "Cozy oversized knit sweater.", "price": Decimal("3799.99"), "category_slug": "tops", "is_published": True},
+                {"title": "Orion Leather Jacket", "slug": "orion-leather-jacket", "description": "Genuine leather jacket.", "price": Decimal("12999.99"), "category_slug": "outerwear", "is_published": True},
+                {"title": "Cora Midi Skirt", "slug": "cora-midi-skirt", "description": "Elegant midi skirt.", "price": Decimal("2999.99"), "category_slug": "bottoms", "is_published": True},
+                {"title": "Phoenix Polo Shirt", "slug": "phoenix-polo-shirt", "description": "Classic pique polo shirt.", "price": Decimal("1999.99"), "category_slug": "men", "is_published": True},
+                {"title": "Vera Linen Dress", "slug": "vera-linen-dress", "description": "Breathable linen dress.", "price": Decimal("4499.99"), "category_slug": "women", "is_published": True},
             ]
 
             product_map = {}
@@ -91,7 +91,8 @@ class Command(BaseCommand):
                         "title": prod_data["title"],
                         "description": prod_data["description"],
                         "category": category,
-                        "base_price": prod_data["base_price"],
+                        "price": prod_data["price"],
+                        "stock": 50,
                         "is_published": prod_data["is_published"],
                     },
                 )
@@ -151,6 +152,7 @@ class Command(BaseCommand):
                         "color_code": var_data["color_code"],
                         "is_active": True,
                         "price_override": None,
+                        "stock": 25,
                     },
                 )
                 if created:

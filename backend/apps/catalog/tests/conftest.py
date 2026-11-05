@@ -154,7 +154,7 @@ def product(category):
         category=category,
         title="Aurora Wool Overcoat",
         slug="aurora-wool-overcoat",
-        base_price="199.00",
+        price="199.00",
         is_published=True,
     )
 
@@ -165,7 +165,7 @@ def draft_product(category):
         category=category,
         title="Secret Draft Coat",
         slug="secret-draft-coat",
-        base_price="99.00",
+        price="99.00",
         is_published=False,
     )
 
@@ -176,7 +176,7 @@ def product_in_inactive_category(inactive_category):
         category=inactive_category,
         title="Hidden Category Coat",
         slug="hidden-category-coat",
-        base_price="149.00",
+        price="149.00",
         is_published=True,
     )
 

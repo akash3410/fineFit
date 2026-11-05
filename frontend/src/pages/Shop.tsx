@@ -12,6 +12,7 @@ export function Shop() {
   const [error, setError] = useState<string | null>(null)
 
   const category = searchParams.get('category') || ''
+  const subcategory = searchParams.get('subcategory') || ''
   const ordering = searchParams.get('ordering') || ''
 
   useEffect(() => {
@@ -19,19 +20,19 @@ export function Shop() {
       setLoading(true)
       setError(null)
       try {
-        const [cats, prods] = await Promise.all([getCategories(), getProducts({ ...(category ? { category } : {}), ...(ordering ? { ordering } : {}), page_size: '24' })])
+        const [cats, prods] = await Promise.all([getCategories(), getProducts({ ...(category ? { category } : {}), ...(subcategory ? { subcategory } : {}), ...(ordering ? { ordering } : {}), page_size: '24' })])
         const catList = Array.isArray(cats) ? (cats as any).results || cats : (cats as any).results || []
         const prodList = (prods as any).results || []
         setCategories(catList)
         setProducts(prodList)
-      } catch (e) {
+      } catch {
         setError('Failed to load products')
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [category, ordering])
+  }, [category, subcategory, ordering])
 
   const updateFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams)

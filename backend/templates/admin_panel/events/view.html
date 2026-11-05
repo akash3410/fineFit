@@ -1,0 +1,55 @@
+{% extends 'admin_panel/base.html' %}
+{% block title %}Event: {{ event.title }} - FineFit Admin{% endblock %}
+{% block page_title %}Event Details{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">{{ event.title }}</h4>
+    <a href="/admin/events/{{ event.id }}/edit/" class="btn btn-primary"><i class="bi bi-pencil me-1"></i> Edit</a>
+    <a href="/admin/events/" class="btn btn-secondary">Back to list</a>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                {% if event.image %}
+                    <img src="{{ event.image.url }}" alt="{{ event.title }}" style="max-height: 250px; width: 100%; object-fit: cover;" class="img-thumbnail rounded mb-3">
+                {% else %}
+                    <div class="bg-light border rounded p-4 text-muted">
+                        <i class="bi bi-image fs-1"></i><br>
+                        No image
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Slug:</strong> {{ event.slug }}</p>
+                        <p><strong>Status:</strong>
+                            {% if event.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </p>
+                        <p><strong>Starts At:</strong> {{ event.start_at|date:"Y-m-d H:i" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Ends At:</strong> {{ event.end_at|date:"Y-m-d H:i" }}</p>
+                        <p><strong>CTA Label:</strong> {{ event.cta_label }}</p>
+                        <p><strong>CTA Link:</strong> {% if event.cta_link %}<a href="{{ event.cta_link }}">{{ event.cta_link }}</a>{% else %}—{% endif %}</p>
+                    </div>
+                </div>
+                <hr>
+                <p><strong>Announcement:</strong></p>
+                <p>{{ event.announcement|default:'—' }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

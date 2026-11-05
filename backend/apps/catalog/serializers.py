@@ -24,9 +24,11 @@ from rest_framework.exceptions import ValidationError
 
 from .models import (
     Category,
+    Event,
     Product,
     ProductImage,
     ProductVariant,
+    Subcategory,
     validate_color_code,
 )
 
@@ -116,11 +118,58 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ["id", "name", "slug", "is_active", "children"]
+        fields = ["id", "name", "slug", "is_active", "image", "children"]
+        read_only_fields = fields
 
     def get_children(self, obj) -> list[dict]:
         children = obj.children.filter(is_active=True)
         return CategorySerializer(children, many=True, context=self.context).data
+
+
+class SubcategorySerializer(serializers.ModelSerializer):
+    """Public representation of a subcategory, including its parent category."""
+
+    category_slug = serializers.SlugRelatedField(
+        slug_field="slug",
+        read_only=True,
+        source="category",
+    )
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
+    class Meta:
+        model = Subcategory
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "image",
+            "is_active",
+            "category",
+            "category_name",
+            "category_slug",
+        ]
+        read_only_fields = fields
+
+
+class EventSerializer(serializers.ModelSerializer):
+    """Public representation of an active event / announcement."""
+
+    class Meta:
+        model = Event
+        fields = [
+            "id",
+            "slug",
+            "title",
+            "announcement",
+            "image",
+            "start_at",
+            "end_at",
+            "is_active",
+            "cta_label",
+            "cta_link",
+            "created_at",
+        ]
+        read_only_fields = fields
 
 
 class ProductImageReadSerializer(serializers.ModelSerializer):
@@ -163,18 +212,24 @@ class ProductVariantReadSerializer(serializers.ModelSerializer):
 
     def get_is_in_stock(self, obj) -> bool:
         stock_record = getattr(obj, "stock_record", None)
-        return stock_record.is_in_stock if stock_record else False
+        if stock_record is not None:
+            return stock_record.is_in_stock
+        return obj.stock > 0
 
     def get_is_low_stock(self, obj) -> bool:
         stock_record = getattr(obj, "stock_record", None)
-        return stock_record.is_low_stock if stock_record else False
+        if stock_record is not None:
+            return stock_record.is_low_stock
+        return 0 < obj.stock <= 5
 
     def get_stock_status(self, obj) -> str:
         stock_record = getattr(obj, "stock_record", None)
-        if not stock_record:
+        if stock_record is not None:
+            if stock_record.is_in_stock:
+                return "LOW_STOCK" if stock_record.is_low_stock else "IN_STOCK"
             return "OUT_OF_STOCK"
-        if stock_record.is_in_stock:
-            return "LOW_STOCK" if stock_record.is_low_stock else "IN_STOCK"
+        if obj.stock > 0:
+            return "LOW_STOCK" if 0 < obj.stock <= 5 else "IN_STOCK"
         return "OUT_OF_STOCK"
 
 
@@ -183,6 +238,9 @@ class ProductListSerializer(serializers.ModelSerializer):
 
     category = serializers.SlugRelatedField(slug_field="slug", read_only=True)
     primary_image = serializers.SerializerMethodField()
+    base_price = serializers.DecimalField(
+        source="price", max_digits=10, decimal_places=2, read_only=True
+    )
 
     class Meta:
         model = Product
@@ -191,6 +249,8 @@ class ProductListSerializer(serializers.ModelSerializer):
             "slug",
             "title",
             "base_price",
+            "discount_price",
+            "stock",
             "category",
             "primary_image",
             "created_at",
@@ -211,6 +271,9 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     images = ProductImageReadSerializer(many=True, read_only=True)
     variants = serializers.SerializerMethodField()
+    base_price = serializers.DecimalField(
+        source="price", max_digits=10, decimal_places=2, read_only=True
+    )
 
     class Meta:
         model = Product
@@ -234,7 +297,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return ProductVariantReadSerializer(
             variants,
             many=True,
-            context={**self.context, "base_price": obj.base_price},
+            context={**self.context, "base_price": obj.price},
         ).data
 
 
@@ -506,8 +569,9 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             attrs["price"] = attrs.pop("base_price")
         elif "base_price" in attrs:
             attrs.pop("base_price")
-        # Don't let variants cause issues in product validation
-        attrs.pop('variants', None)
+        # ``variants`` is a declared ListField consumed by create()/update()
+        # (nested creation happens inside their atomic blocks), so it must be
+        # preserved here rather than stripped.
         return attrs
 
     def _ensure_slug(self, validated_data):
@@ -529,7 +593,12 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         # back the whole atomic block so no partial product/variants persist.
         variant_errors = []
         for variant_data in variants_data:
-            variant = ProductVariant(product=product, **variant_data)
+            # Security: the parent product is assigned server-side; never trust
+            # a client-supplied ``product``/``product_id`` key in nested data.
+            clean_data = {
+                k: v for k, v in variant_data.items() if k not in ("product", "product_id", "pk")
+            }
+            variant = ProductVariant(product=product, **clean_data)
             try:
                 variant.full_clean()
             except DjangoValidationError as exc:

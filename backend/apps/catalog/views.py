@@ -13,11 +13,12 @@ from rest_framework import filters, generics, viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny
 
-from .models import Category, Product, ProductImage, ProductVariant
+from .models import Category, Event, Product, ProductImage, ProductVariant, Subcategory
 from .permissions import ManageModelPermissions
 from .serializers import (
     CategorySerializer,
     CategoryWriteSerializer,
+    EventSerializer,
     ProductDetailSerializer,
     ProductImageReadSerializer,
     ProductImageWriteSerializer,
@@ -25,6 +26,7 @@ from .serializers import (
     ProductVariantReadSerializer,
     ProductVariantWriteSerializer,
     ProductWriteSerializer,
+    SubcategorySerializer,
 )
 
 
@@ -58,9 +60,54 @@ class CategoryListView(generics.ListAPIView):
 
     serializer_class = CategorySerializer
     permission_classes = [AllowAny]
+    pagination_class = CatalogPagination
 
     def get_queryset(self):
         return Category.objects.active().filter(parent=None).prefetch_related("children")
+
+
+class SubcategoryListView(generics.ListAPIView):
+    """Active subcategories, optionally filtered by parent category."""
+
+    serializer_class = SubcategorySerializer
+    permission_classes = [AllowAny]
+    pagination_class = CatalogPagination
+
+    def get_queryset(self):
+        qs = Subcategory.objects.active().select_related("category")
+        category = self.request.query_params.get("category")
+        if category:
+            try:
+                qs = qs.filter(category_id=int(category))
+            except (ValueError, TypeError):
+                qs = qs.filter(category__slug=category)
+        return qs.order_by("category__name", "name")
+
+
+class EventListView(generics.ListAPIView):
+    """Active events within their date window, newest first."""
+
+    serializer_class = EventSerializer
+    permission_classes = [AllowAny]
+    pagination_class = CatalogPagination
+
+    def get_queryset(self):
+        return Event.objects.active()
+
+
+class ProductOrderingFilter(filters.OrderingFilter):
+    """
+    Ordering filter that preserves the public API ``base_price`` contract by
+    mapping it to the model's ``price`` field before querying.
+    """
+
+    base_to_model = {"base_price": "price"}
+
+    def get_ordering(self, request, queryset, view):
+        ordering = super().get_ordering(request, queryset, view)
+        if ordering:
+            ordering = [self.base_to_model.get(field, field) for field in ordering]
+        return ordering
 
 
 class ProductListView(generics.ListAPIView):
@@ -72,7 +119,7 @@ class ProductListView(generics.ListAPIView):
     serializer_class = ProductListSerializer
     permission_classes = [AllowAny]
     pagination_class = CatalogPagination
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [filters.SearchFilter, ProductOrderingFilter]
     search_fields = ["title", "description"]
     ordering_fields = ["base_price", "created_at", "title"]
     ordering = ["-created_at"]
@@ -101,13 +148,20 @@ class ProductListView(generics.ListAPIView):
         if color:
             qs = qs.filter(variants__color_name__iexact=color, variants__is_active=True)
 
+        subcategory = params.get("subcategory")
+        if subcategory:
+            try:
+                qs = qs.filter(subcategory_id=int(subcategory))
+            except (ValueError, TypeError):
+                qs = qs.filter(subcategory__slug=subcategory)
+
         price_min = params.get("price_min")
         if price_min is not None and price_min != "":
-            qs = qs.filter(base_price__gte=price_min)
+            qs = qs.filter(price__gte=price_min)
 
         price_max = params.get("price_max")
         if price_max is not None and price_max != "":
-            qs = qs.filter(base_price__lte=price_max)
+            qs = qs.filter(price__lte=price_max)
 
         return qs.distinct()
 

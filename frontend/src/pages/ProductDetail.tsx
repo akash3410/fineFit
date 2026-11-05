@@ -19,7 +19,7 @@ export function ProductDetail() {
         setProduct(data)
         const active = (data.variants || []).find((v: any) => v.is_active)
         if (active) setSelectedVariant(active.id)
-      } catch (e) {
+      } catch {
         setError('Failed to load product')
       } finally {
         setLoading(false)
