@@ -450,12 +450,16 @@ body {
 /* ────────────────────────────────────────────────────────────────────────────
  * Category Gallery — editorial category collage.
  *
- * Reference layout (magazine spread): a deep-maroon serif headline with a small
+ * Reference layout (magazine spread): a brand-teal serif headline with a small
  * year and a short lede on the left, then four identically sized portrait
  * images, each labelled with a small number above and a centred caption below.
  * The images sit in a three-column grid and are staggered vertically: 01 and 04
  * stack in the right-hand column, 03 sits alone in the middle column pushed
  * down, and 02 closes the left column well below the lede.
+ *
+ * Only four cards are on stage at a time. The arrow pager swaps the contents of
+ * those four slots (never the layout) with a short horizontal fade-through, so
+ * the headline and the staggered composition stay exactly where they are.
  *
  * The stagger is expressed as a percentage margin-top on each item. Percentage
  * margins on a grid item resolve against its grid area's inline size, so the
@@ -465,11 +469,12 @@ body {
  * ────────────────────────────────────────────────────────────────────────── */
 
 .category-gallery {
-  --cg-bg: #f6e7e0;
-  --cg-ink: #6d2430;
-  --cg-ink-soft: #6b3b42;
-  --cg-ochre: #c9801f;
-  --cg-line: rgba(109, 36, 48, 0.22);
+  /* Brand palette — deep brand teal surface (#0c4965) with light ink. */
+  --cg-bg: #0c4965;
+  --cg-ink: #ffffff;
+  --cg-ink-soft: rgba(255, 255, 255, 0.78);
+  --cg-accent: #9dc9de;
+  --cg-line: rgba(255, 255, 255, 0.3);
   --cg-gap: 5.5%;
 
   position: relative;
@@ -540,13 +545,73 @@ body {
 }
 
 .category-gallery__view-all:hover {
-  color: var(--cg-ochre);
-  border-color: var(--cg-ochre);
+  color: var(--cg-accent);
+  border-color: var(--cg-accent);
 }
 
 .category-gallery__view-all:focus-visible {
-  outline: 2px solid var(--cg-ochre);
+  outline: 2px solid var(--cg-accent);
   outline-offset: 4px;
+}
+
+/* ── Page arrows — swap the four card slots in place ── */
+
+.category-gallery__pager {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.6rem;
+}
+
+.category-gallery__pager-btn {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--cg-line);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--cg-ink);
+  cursor: pointer;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    opacity 200ms ease;
+}
+
+.category-gallery__pager-btn:hover:not(:disabled) {
+  background: var(--cg-ink);
+  border-color: var(--cg-ink);
+  color: var(--cg-bg);
+}
+
+.category-gallery__pager-btn:focus-visible {
+  outline: 2px solid var(--cg-accent);
+  outline-offset: 3px;
+}
+
+.category-gallery__pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.category-gallery__pager-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.category-gallery__pager-count {
+  min-width: 3.4rem;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .category-gallery__view-all-arrow {
@@ -567,8 +632,17 @@ body {
 }
 
 .category-gallery__item:focus-visible {
-  outline: 2px solid var(--cg-ochre);
+  outline: 2px solid var(--cg-accent);
   outline-offset: 4px;
+}
+
+/* Card swap: only the contents of a slot animate, never its grid position. */
+.category-gallery__item--enter-next {
+  animation-name: category-gallery-enter-next;
+}
+
+.category-gallery__item--enter-prev {
+  animation-name: category-gallery-enter-prev;
 }
 
 .category-gallery__index {
@@ -587,7 +661,7 @@ body {
   display: block;
   overflow: hidden;
   aspect-ratio: 5 / 7;
-  background: rgba(109, 36, 48, 0.08);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .category-gallery__image {
@@ -610,8 +684,8 @@ body {
   height: 100%;
   background: linear-gradient(
     135deg,
-    rgba(109, 36, 48, 0.14) 0%,
-    rgba(201, 128, 31, 0.22) 100%
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(157, 201, 222, 0.42) 100%
   );
 }
 
@@ -649,16 +723,38 @@ body {
   }
 }
 
+@keyframes category-gallery-enter-next {
+  from {
+    opacity: 0;
+    transform: translateX(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes category-gallery-enter-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* ── Loading skeletons ── */
 
 .category-gallery__skeleton {
   display: block;
-  background-color: rgba(109, 36, 48, 0.08);
+  background-color: rgba(255, 255, 255, 0.1);
   background-image: linear-gradient(
     90deg,
-    rgba(109, 36, 48, 0.06) 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    rgba(109, 36, 48, 0.06) 100%
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0.06) 100%
   );
   background-size: 200% 100%;
   animation: skeleton-pulse 1.4s ease-in-out infinite;
@@ -727,6 +823,10 @@ body {
   .category-gallery__item,
   .category-gallery__image {
     animation: none;
+    transition: none;
+  }
+
+  .category-gallery__pager-btn {
     transition: none;
   }
 }
