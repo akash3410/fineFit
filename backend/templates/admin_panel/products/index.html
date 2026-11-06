@@ -56,7 +56,16 @@
                 <tbody>
                     {% for product in page_obj %}
                     <tr>
-                        <td>{{ product.title|truncatechars:30 }}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if product.primary_image_obj and product.primary_image_obj.image %}
+                                    <img src="{{ product.primary_image_obj.image.url }}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">
+                                {% else %}
+                                    <span class="bg-light border rounded d-inline-flex align-items-center justify-content-center text-muted" style="width:40px;height:40px;"><i class="bi bi-image"></i></span>
+                                {% endif %}
+                                <span>{{ product.title|truncatechars:30 }}</span>
+                            </div>
+                        </td>
                         <td>{{ product.sku|default:"-" }}</td>
                         <td>{{ product.category.name }}</td>
                         <td>{{ product.subcategory.name|default:"-" }}</td>

@@ -44,8 +44,8 @@
     <div class="card-body">
         <div class="row">
             {% for img in images %}
-            <div class="col-md-3">
-                <img src="{{ img.image.url }}" class="img-thumbnail" style="height: 200px; object-fit: cover; width: 100%;">
+            <div class="col-md-3 mb-2">
+                <img src="{{ img.image.url }}" class="img-thumbnail" style="height: 200px; object-fit: cover; width: 100%;" onerror="this.onerror=null;this.alt='Image not found';">
                 {% if img.is_main or img.is_primary %}<span class="badge bg-primary mt-1">Main</span>{% endif %}
             </div>
             {% endfor %}

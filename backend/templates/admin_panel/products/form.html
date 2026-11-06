@@ -90,7 +90,7 @@
             <div class="row">
                 {% for img in images %}
                 <div class="col-md-3 mb-2">
-                    <img src="{{ img.image.url }}" class="img-thumbnail" style="height: 150px; object-fit: cover;">
+                    <img src="{{ img.image.url }}" class="img-thumbnail" style="height: 150px; object-fit: cover; width: 100%;" onerror="this.onerror=null;this.src='';this.alt='Image not found';this.classList.add('bg-light');">
                     <div class="form-check mt-1">
                         <input class="form-check-input" type="radio" name="main_image_existing" value="{{ img.id }}" {% if img.is_main or img.is_primary %}checked{% endif %}>
                         <label class="form-check-label small">Main Image</label>

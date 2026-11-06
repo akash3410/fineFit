@@ -9,7 +9,10 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import reverse
 
-# Paths that do not require 2FA enrollment (exempt from middleware redirect)
+# Paths that do not require 2FA enrollment (exempt from middleware redirect).
+# NOTE: "/admin/" is intentionally NOT exempted broadly; only the specific
+# authentication/recovery/enrollment routes below are exempt so that protected
+# admin pages still enforce 2FA.
 EXEMPT_PATHS = [
     "/admin/login/",
     "/admin/logout/",
@@ -18,9 +21,18 @@ EXEMPT_PATHS = [
     "/admin/forgot-password/",
     "/admin/reset-password/",
     "/admin/verify/",
-    "/admin/",
     "/api/v1/",
 ]
+
+
+def _is_exempt_path(path: str) -> bool:
+    if any(path == p or path.startswith(p) for p in EXEMPT_PATHS):
+        return True
+    # Public static/media assets must never be gated behind 2FA.
+    for url in (getattr(settings, "MEDIA_URL", None), getattr(settings, "STATIC_URL", None)):
+        if url and (path == url or path.startswith(url)):
+            return True
+    return False
 
 
 class TwoFactorRequiredMiddleware:
@@ -39,7 +51,7 @@ class TwoFactorRequiredMiddleware:
         path = request.path
 
         # Skip exempt paths
-        if any(path == p or path.startswith(p) for p in EXEMPT_PATHS):
+        if _is_exempt_path(path):
             return None
 
         # Check if user has a verified 2FA method

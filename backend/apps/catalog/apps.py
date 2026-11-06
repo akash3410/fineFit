@@ -7,3 +7,7 @@ class CatalogConfig(AppConfig):
     name = "apps.catalog"
     label = "catalog"
     verbose_name = _("Product Catalog")
+
+    def ready(self):
+        # Register signal handlers (e.g. media cleanup on image deletion).
+        import apps.catalog.signals  # noqa: F401

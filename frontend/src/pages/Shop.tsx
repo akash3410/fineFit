@@ -1,3 +1,4 @@
+import { normalizeImageUrl } from '../utils/image'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { getCategories, getProducts } from '../api/catalog'
@@ -77,7 +78,7 @@ export function Shop() {
                 return (
                   <Link key={product.id} to={"/product/"+product.slug} className="group">
                     <div className="aspect-[4/5] w-full overflow-hidden rounded-lg bg-stone-100">
-                      {img ? <img src={img} alt={product.primary_image?.alt_text||product.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-sm text-stone-400">No image</div>}
+                      {img ? <img src={normalizeImageUrl(img) ?? undefined} alt={product.primary_image?.alt_text||product.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-sm text-stone-400">No image</div>}
                     </div>
                     <div className="mt-3"><h3 className="text-sm font-medium">{product.title}</h3><p className="text-sm text-stone-600">{formatBDT(product.base_price)}</p></div>
                   </Link>

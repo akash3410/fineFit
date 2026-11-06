@@ -11,6 +11,7 @@
  * handled locally so the rest of the homepage stays untouched.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import { normalizeImageUrl } from "../../utils/image";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCategories } from "../../api/catalog";
@@ -123,7 +124,7 @@ export function CategoryGallery({ className }: CategoryGalleryProps) {
               <span className="category-gallery__frame">
                 {category.image ? (
                   <img
-                    src={category.image}
+                    src={normalizeImageUrl(category.image) ?? undefined}
                     alt=""
                     className="category-gallery__image"
                     loading="lazy"

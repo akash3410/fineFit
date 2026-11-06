@@ -238,3 +238,16 @@ class ManageImageViewSet(viewsets.ModelViewSet):
         if self.action in ("create", "update", "partial_update"):
             return ProductImageWriteSerializer
         return ProductImageReadSerializer
+
+    def perform_destroy(self, instance):
+        # Purge the stored media file when the image row is deleted so orphaned
+        # assets do not accumulate on disk. File removal is best-effort: the
+        # database row is removed even if the file is already missing.
+        file_field = instance.image
+        name = file_field.name if file_field and file_field.name else None
+        try:
+            if name:
+                file_field.delete(save=False)
+        except OSError:
+            pass
+        super().perform_destroy(instance)

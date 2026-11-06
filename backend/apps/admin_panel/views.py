@@ -266,7 +266,12 @@ def subcategory_delete(request, pk):
 
 @user_passes_test(admin_access_required)
 def product_list(request):
-    queryset = Product.objects.filter(is_deleted=False).select_related('category', 'subcategory').order_by('-created_at')
+    queryset = (
+        Product.objects.filter(is_deleted=False)
+        .select_related('category', 'subcategory')
+        .prefetch_related('images')
+        .order_by('-created_at')
+    )
     search = request.GET.get('q', '')
     category_id = request.GET.get('category')
     subcategory_id = request.GET.get('subcategory')
@@ -278,6 +283,9 @@ def product_list(request):
         queryset = queryset.filter(subcategory_id=subcategory_id)
     paginator = Paginator(queryset, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
+    for product in page_obj:
+        imgs = list(product.images.all())
+        product.primary_image_obj = next((i for i in imgs if i.is_primary), imgs[0] if imgs else None)
     categories = Category.objects.filter(is_deleted=False)
     subcategories = Subcategory.objects.filter(is_deleted=False)
     return render(request, 'admin_panel/products/index.html', {
@@ -415,47 +423,61 @@ def product_edit(request, pk):
                     return render(request, 'admin_panel/products/form.html', {'product': product, 'categories': categories, 'subcategories': subcategories, 'variants': variants, 'images': images, 'action': 'Edit'})
             try:
                 from decimal import Decimal
-                product.title = title
-                product.sku = sku
-                product.category = category
-                product.subcategory = subcategory
-                product.description = description
-                product.price = Decimal(price)
-                product.discount_price = Decimal(discount_price) if discount_price else None
-                product.stock = int(stock)
-                product.status = status
-                product.is_published = is_published
-                product.is_featured = is_featured
-                product.save()
-                # Handle variants
-                variant_ids = request.POST.getlist('variant_id')
-                variant_skus = request.POST.getlist('variant_sku')
-                variant_sizes = request.POST.getlist('variant_size')
-                variant_colors = request.POST.getlist('variant_color')
-                variant_stocks = request.POST.getlist('variant_stock')
-                variant_prices = request.POST.getlist('variant_price')
-                # Track which variant IDs are submitted to handle deletions if needed
-                submitted_ids = []
-                for i in range(len(variant_skus)):
-                    if variant_skus[i]:
-                        variant_id = variant_ids[i] if i < len(variant_ids) and variant_ids[i] else None
-                        v_sku = variant_skus[i]
-                        v_size = variant_sizes[i] if i < len(variant_sizes) else ''
-                        v_color = variant_colors[i] if i < len(variant_colors) else ''
-                        v_stock = int(variant_stocks[i]) if i < len(variant_stocks) and variant_stocks[i] else 0
-                        v_price = Decimal(variant_prices[i]) if i < len(variant_prices) and variant_prices[i] else None
-                        if variant_id:
-                            try:
-                                var = ProductVariant.objects.get(id=variant_id, product=product)
-                                var.sku = v_sku
-                                var.size = v_size
-                                var.color_name = v_color
-                                var.stock = v_stock
-                                var.price_override = v_price
-                                var.save()
-                                submitted_ids.append(var.id)
-                                sync_variant_inventory(request, var, v_stock)
-                            except ProductVariant.DoesNotExist:
+                from django.db import transaction
+
+                with transaction.atomic():
+                    product.title = title
+                    product.sku = sku
+                    product.category = category
+                    product.subcategory = subcategory
+                    product.description = description
+                    product.price = Decimal(price)
+                    product.discount_price = Decimal(discount_price) if discount_price else None
+                    product.stock = int(stock)
+                    product.status = status
+                    product.is_published = is_published
+                    product.is_featured = is_featured
+                    product.save()
+                    # Handle variants
+                    variant_ids = request.POST.getlist('variant_id')
+                    variant_skus = request.POST.getlist('variant_sku')
+                    variant_sizes = request.POST.getlist('variant_size')
+                    variant_colors = request.POST.getlist('variant_color')
+                    variant_stocks = request.POST.getlist('variant_stock')
+                    variant_prices = request.POST.getlist('variant_price')
+                    # Track which variant IDs are submitted to handle deletions if needed
+                    submitted_ids = []
+                    for i in range(len(variant_skus)):
+                        if variant_skus[i]:
+                            variant_id = variant_ids[i] if i < len(variant_ids) and variant_ids[i] else None
+                            v_sku = variant_skus[i]
+                            v_size = variant_sizes[i] if i < len(variant_sizes) else ''
+                            v_color = variant_colors[i] if i < len(variant_colors) else ''
+                            v_stock = int(variant_stocks[i]) if i < len(variant_stocks) and variant_stocks[i] else 0
+                            v_price = Decimal(variant_prices[i]) if i < len(variant_prices) and variant_prices[i] else None
+                            if variant_id:
+                                try:
+                                    var = ProductVariant.objects.get(id=variant_id, product=product)
+                                    var.sku = v_sku
+                                    var.size = v_size
+                                    var.color_name = v_color
+                                    var.stock = v_stock
+                                    var.price_override = v_price
+                                    var.save()
+                                    submitted_ids.append(var.id)
+                                    sync_variant_inventory(request, var, v_stock)
+                                except ProductVariant.DoesNotExist:
+                                    var = ProductVariant.objects.create(
+                                        product=product,
+                                        sku=v_sku,
+                                        size=v_size,
+                                        color_name=v_color,
+                                        stock=v_stock,
+                                        price_override=v_price,
+                                    )
+                                    submitted_ids.append(var.id)
+                                    sync_variant_inventory(request, var, v_stock)
+                            else:
                                 var = ProductVariant.objects.create(
                                     product=product,
                                     sku=v_sku,
@@ -466,18 +488,31 @@ def product_edit(request, pk):
                                 )
                                 submitted_ids.append(var.id)
                                 sync_variant_inventory(request, var, v_stock)
-                        else:
-                            var = ProductVariant.objects.create(
-                                product=product,
-                                sku=v_sku,
-                                size=v_size,
-                                color_name=v_color,
-                                stock=v_stock,
-                                price_override=v_price,
-                            )
-                            submitted_ids.append(var.id)
-                            sync_variant_inventory(request, var, v_stock)
-                # Optionally delete variants not submitted? Or leave them - be conservative and don't delete
+                    # Handle images: upload new files and update primary selection
+                    from django.db.models import Max
+                    main_image_existing = (request.POST.get('main_image_existing') or '').strip()
+                    new_images = request.FILES.getlist('images')
+                    max_order = product.images.aggregate(m=Max('display_order')).get('m')
+                    next_order = (max_order + 1) if max_order is not None else 0
+                    if main_image_existing:
+                        product.images.update(is_primary=False)
+                        product.images.filter(pk=main_image_existing).update(is_primary=True)
+                    for idx, img in enumerate(new_images):
+                        is_primary = False
+                        if not main_image_existing and idx == 0 and not product.images.filter(is_primary=True).exists():
+                            is_primary = True
+                        ProductImage.objects.create(
+                            product=product,
+                            image=img,
+                            alt_text=title,
+                            display_order=next_order + idx,
+                            is_primary=is_primary,
+                        )
+                    if not product.images.filter(is_primary=True).exists():
+                        first = product.images.order_by('display_order', 'id').first()
+                        if first:
+                            first.is_primary = True
+                            first.save(update_fields=['is_primary'])
                 messages.success(request, 'Product updated successfully.')
                 return redirect('admin_panel:product_list')
             except Exception as e:

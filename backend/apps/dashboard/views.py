@@ -38,8 +38,16 @@ def dashboard_view(request):
                 total_inventory_value += product.price * variant.stock
     
     # Recently added products
-    recent_products = Product.objects.filter(is_deleted=False).order_by('-created_at')[:10]
-    
+    recent_products = list(
+        Product.objects.filter(is_deleted=False)
+        .select_related('category')
+        .prefetch_related('images')
+        .order_by('-created_at')[:10]
+    )
+    for product in recent_products:
+        imgs = list(product.images.all())
+        product.primary_image_obj = next((i for i in imgs if i.is_primary), imgs[0] if imgs else None)
+
     context = {
         'total_categories': total_categories,
         'total_subcategories': total_subcategories,
@@ -85,12 +93,20 @@ def get_dashboard_context():
                 total_inventory_value += product.price * variant.stock
     
     # Recently added products
-    recent_products = Product.objects.filter(is_deleted=False).order_by('-created_at')[:10]
+    recent_products = list(
+        Product.objects.filter(is_deleted=False)
+        .select_related('category')
+        .prefetch_related('images')
+        .order_by('-created_at')[:10]
+    )
+    for product in recent_products:
+        imgs = list(product.images.all())
+        product.primary_image_obj = next((i for i in imgs if i.is_primary), imgs[0] if imgs else None)
 
     # Order stats
     total_orders = Order.objects.count()
     pending_orders = Order.objects.filter(status=OrderStatus.PENDING).count()
-    
+
     return {
         'total_orders': total_orders,
         'pending_orders': pending_orders,

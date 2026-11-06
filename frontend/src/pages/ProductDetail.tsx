@@ -4,6 +4,7 @@ import { getProduct } from '../api/catalog'
 import { MAX_QUANTITY_PER_ITEM } from '../api/cart'
 import { useCart } from '../features/cart/CartContext'
 import type { ProductDetail } from '../types/catalog'
+import { normalizeImageUrl } from '../utils/image'
 import { formatBDT } from '../utils/currency'
 
 const STOCK_LABELS: Record<string, string> = {
@@ -79,7 +80,7 @@ export function ProductDetail() {
       <div className="mb-6"><Link to="/shop" className="text-sm text-stone-600 hover:text-stone-900">← Back to shop</Link></div>
       <div className="grid gap-10 lg:grid-cols-2">
         <div>
-          {hero ? <div className="aspect-[4/5] w-full overflow-hidden rounded-lg bg-stone-100"><img src={hero.image} alt={hero.alt_text||product.title} className="h-full w-full object-cover" /></div> : <div className="flex aspect-[4/5] items-center justify-center rounded-lg bg-stone-100 text-sm text-stone-400">No image</div>}
+          {hero ? <div className="aspect-[4/5] w-full overflow-hidden rounded-lg bg-stone-100"><img src={normalizeImageUrl(hero.image) ?? undefined} alt={hero.alt_text||product.title} className="h-full w-full object-cover" /></div> : <div className="flex aspect-[4/5] items-center justify-center rounded-lg bg-stone-100 text-sm text-stone-400">No image</div>}
         </div>
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{product.title}</h1>

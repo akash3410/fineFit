@@ -7,6 +7,8 @@ primary-image constraints.
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.storage import default_storage
+from django.test.client import BOUNDARY, encode_multipart
 from django.urls import reverse
 
 from apps.catalog.models import ProductImage
@@ -154,3 +156,61 @@ class TestImageOrdering:
         ProductImage.objects.create(product=product, image="a.png", display_order=1)
         orders = [img.display_order for img in product.images.all()]
         assert orders == [1, 2]
+
+
+class TestImagePartialUpdate:
+    def test_patch_without_image_updates_metadata_only(self, catalog_manager_client, product):
+        image = ProductImage.objects.create(
+            product=product, image=make_image_file("meta"), alt_text="old", display_order=1
+        )
+        url = _manage_images_url(image.pk)
+        response = catalog_manager_client.patch(
+            url,
+            {"alt_text": "new text", "display_order": 5},
+            content_type="application/json",
+        )
+        assert response.status_code == 200, response.data
+        image.refresh_from_db()
+        assert image.alt_text == "new text"
+        assert image.display_order == 5
+        # The stored file must be untouched when no new image is supplied.
+        assert default_storage.exists(image.image.name)
+
+    def test_patch_replacing_image_deletes_old_file(self, catalog_manager_client, product):
+        image = ProductImage.objects.create(product=product, image=make_image_file("old"))
+        old_name = image.image.name
+        assert default_storage.exists(old_name)
+        url = _manage_images_url(image.pk)
+        body = encode_multipart(
+            BOUNDARY, {"image": make_image_file("new"), "alt_text": "refreshed"}
+        )
+        response = catalog_manager_client.patch(
+            url,
+            data=body,
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        assert response.status_code == 200, response.data
+        image.refresh_from_db()
+        # Old file must be purged; new file must exist.
+        assert not default_storage.exists(old_name)
+        assert default_storage.exists(image.image.name)
+        assert image.alt_text == "refreshed"
+
+
+class TestImageDeleteCleanup:
+    def test_delete_removes_stored_file(self, catalog_manager_client, product):
+        image = ProductImage.objects.create(product=product, image=make_image_file("bye"))
+        name = image.image.name
+        assert default_storage.exists(name)
+        response = catalog_manager_client.delete(_manage_images_url(image.pk))
+        assert response.status_code == 204
+        assert not ProductImage.objects.filter(pk=image.pk).exists()
+        assert not default_storage.exists(name)
+
+    def test_product_cascade_deletes_image_files(self, catalog_manager_client, product):
+        image = ProductImage.objects.create(product=product, image=make_image_file("cascade"))
+        name = image.image.name
+        assert default_storage.exists(name)
+        product.delete()
+        assert not ProductImage.objects.filter(pk=image.pk).exists()
+        assert not default_storage.exists(name)

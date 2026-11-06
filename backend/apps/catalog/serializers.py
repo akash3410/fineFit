@@ -17,6 +17,8 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils.text import slugify
+from pathlib import Path
+
 from django.utils.translation import gettext_lazy as _
 from PIL import Image
 from rest_framework import serializers
@@ -73,8 +75,19 @@ def validate_image_file(file) -> None:
     finally:
         file.seek(0)
 
-    if img_format not in ALLOWED_IMAGE_FORMATS:
-        raise ValidationError(_("Unsupported image type. Allowed formats: JPEG, PNG, WebP."))
+    EXTENSION_BY_FORMAT = {
+        "JPEG": {".jpg", ".jpeg"},
+        "PNG": {".png"},
+        "WEBP": {".webp"},
+    }
+
+    name = getattr(file, "name", "") or ""
+    suffix = Path(name).suffix.lower()
+    if suffix and suffix not in EXTENSION_BY_FORMAT.get(img_format, set()):
+        raise ValidationError(
+            _("File extension does not match image content. Upload a .%(ext)s file.")
+            % {"ext": img_format.lower()}
+        )
 
     if width > MAX_IMAGE_DIMENSION or height > MAX_IMAGE_DIMENSION:
         raise ValidationError(
@@ -402,9 +415,15 @@ class ProductVariantWriteSerializer(serializers.ModelSerializer):
 
 
 class ProductImageWriteSerializer(serializers.ModelSerializer):
-    """Create/update a product image with file and relationship validation."""
+    """Create/update a product image with file and relationship validation.
 
-    image = serializers.ImageField(required=True)
+    ``image`` is required on creation but optional on updates so a partial
+    (PATCH) request can change ``alt_text``/``display_order``/``is_primary``
+    without forcing a re-upload. When an image is replaced, the previous file
+    is removed from storage so orphaned media does not accumulate.
+    """
+
+    image = serializers.ImageField(required=False)
 
     class Meta:
         model = ProductImage
@@ -420,10 +439,13 @@ class ProductImageWriteSerializer(serializers.ModelSerializer):
         return file
 
     def validate(self, attrs):
+        if self.instance is None and "image" not in attrs:
+            raise ValidationError({"image": _("An image file is required.")})
         instance = ProductImage(
             pk=self.instance.pk if self.instance else None,
             product=attrs.get("product", self.instance.product if self.instance else None),
             variant=attrs.get("variant", self.instance.variant if self.instance else None),
+            image=attrs.get("image"),
             alt_text=attrs.get("alt_text", self.instance.alt_text if self.instance else ""),
             display_order=attrs.get(
                 "display_order", self.instance.display_order if self.instance else 0
@@ -446,6 +468,22 @@ class ProductImageWriteSerializer(serializers.ModelSerializer):
                     {"is_primary": _("This product already has a primary image.")}
                 )
         return attrs
+
+    def update(self, instance, validated_data):
+        # Capture the previous file before it is replaced so we can purge the
+        # orphan from storage once the new file is committed.
+        old_image = instance.image
+        old_name = old_image.name if old_image and old_image.name else None
+        instance = super().update(instance, validated_data)
+        new_image = instance.image
+        new_name = new_image.name if new_image and new_image.name else None
+        if old_name and old_name != new_name:
+            try:
+                old_image.delete(save=False)
+            except OSError:
+                # A missing or unreadable file must not fail the update.
+                pass
+        return instance
 
 
 class ProductVariantNestedWriteSerializer(serializers.ModelSerializer):
