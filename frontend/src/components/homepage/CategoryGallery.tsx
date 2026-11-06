@@ -17,7 +17,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { normalizeImageUrl } from "../../utils/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCategories } from "../../api/catalog";
 import type { Category, PaginatedResponse } from "../../types/catalog";
@@ -53,6 +53,46 @@ export function CategoryGallery({ className }: CategoryGalleryProps) {
   const [direction, setDirection] = useState<PageDirection>("initial");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const visibleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hiddenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pagerVisible, setPagerVisible] = useState(false);
+
+  // Sync animation states back to "initial" after each page transition completes.
+  useEffect(() => {
+    const timer = setTimeout(() => setDirection("initial"), 700);
+    return () => clearTimeout(timer);
+  }, [direction]);
+
+  // Show/hide the pager based on whether the category section is in view.
+  useEffect(() => {
+    if (!pagerRef.current) return;
+
+    const margin = 0;
+    const rect = pagerRef.current.getBoundingClientRect();
+    const sectionTop = rect.top;
+    const sectionBottom = rect.bottom;
+    const viewportHeight = window.innerHeight;
+
+    // The pager is considered "in view" as long as any part of the section
+    // overlaps the viewport. A slight margin keeps it visible when the very
+    // bottom edge is near the scroll threshold.
+    const topInView = sectionTop <= viewportHeight - margin;
+    const bottomInView = sectionBottom >= margin;
+
+    if (topInView && bottomInView) {
+      if (hiddenTimer.current) clearTimeout(hiddenTimer.current);
+      hiddenTimer.current = null;
+      if (!pagerVisible) {
+        setPagerVisible(true);
+      }
+    } else {
+      if (visibleTimer.current) clearTimeout(visibleTimer.current);
+      visibleTimer.current = setTimeout(() => {
+        setPagerVisible(false);
+      }, 280);
+    }
+  }, [pagerVisible]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +182,7 @@ export function CategoryGallery({ className }: CategoryGalleryProps) {
             </Link>
 
             {pageCount > 1 && (
-              <div className="category-gallery__pager">
+              <div className="category-gallery__pager category-gallery__pager--under-view-all">
                 <button
                   type="button"
                   className="category-gallery__pager-btn"
@@ -160,10 +200,11 @@ export function CategoryGallery({ className }: CategoryGalleryProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 5l-7 7 7 7" />
                   </svg>
                 </button>
-                <span className="category-gallery__pager-count" aria-hidden="true">
-                  {String(currentPage + 1).padStart(2, "0")} /{" "}
-                  {String(pageCount).padStart(2, "0")}
+
+                <span className="category-gallery__pager-count" aria-live="polite">
+                  {String(currentPage + 1).padStart(2, "0")} / {String(pageCount).padStart(2, "0")}
                 </span>
+
                 <button
                   type="button"
                   className="category-gallery__pager-btn"
@@ -181,6 +222,7 @@ export function CategoryGallery({ className }: CategoryGalleryProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
+
                 <span className="sr-only" aria-live="polite">
                   Showing categories {firstIndex} to {lastIndex} of {categories.length}
                 </span>
@@ -201,9 +243,6 @@ export function CategoryGallery({ className }: CategoryGalleryProps) {
                 .join(" ")}
               aria-label={`Browse the ${category.name} collection`}
             >
-              <span className="category-gallery__index" aria-hidden="true">
-                {String(currentPage * PAGE_SIZE + index + 1).padStart(2, "0")}
-              </span>
               <span className="category-gallery__frame">
                 {category.image ? (
                   <img
@@ -222,6 +261,29 @@ export function CategoryGallery({ className }: CategoryGalleryProps) {
             </Link>
           ))}
         </div>
+        {pageCount > 1 && (
+          <div
+            ref={pagerRef}
+            className={[
+              "category-gallery__pager",
+              "category-gallery__pager--under-view-all",
+              "page-count",
+              !pagerVisible && "category-gallery__pager--hidden",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {pageCount > 2 && (
+              <span className="category-gallery__pager-count" aria-live="polite">
+                {String(currentPage + 1).padStart(2, "0")} / {String(pageCount).padStart(2, "0")}
+              </span>
+            )}
+
+            <span className="sr-only" aria-live="polite">
+              Showing categories {firstIndex} to {lastIndex} of {categories.length}
+            </span>
+          </div>
+        )}
       </div>
     </section>
   );
