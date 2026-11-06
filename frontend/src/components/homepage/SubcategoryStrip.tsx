@@ -116,8 +116,11 @@ export function SubcategoryStrip({ className }: SubcategoryStripProps) {
     <section className={sectionClass} aria-labelledby="subcategory-strip-title">
       <div className="subcategory-strip__panel">
         <h2 id="subcategory-strip-title" className="subcategory-strip__title">
-          Shop by Subcategory
+          Find Your Fit
         </h2>
+        <p className="subcategory-strip__description" aria-label="Made for your style.">
+          Made for your style.
+        </p>
 
         <div className="subcategory-strip__grid">
           {subcategories.map((sub) => (

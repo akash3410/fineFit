@@ -666,6 +666,18 @@ body {
   color: #1c1917;
 }
 
+.subcategory-strip__description {
+  margin: 0 auto;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-style: italic;
+  font-weight: 400;
+  color: #6c757d;
+  text-align: center;
+  max-width: 28rem;
+  line-height: 1.4;
+}
+
 .subcategory-strip__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -686,7 +698,16 @@ body {
   transition:
     transform 500ms cubic-bezier(0.22, 0.61, 0.36, 1),
     box-shadow 500ms ease;
+  animation: subcategory-strip-slide-in 500ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  opacity: 0;
 }
+
+.subcategory-strip__card:nth-child(1) { animation-delay: 0ms; }
+.subcategory-strip__card:nth-child(2) { animation-delay: 120ms; }
+.subcategory-strip__card:nth-child(3) { animation-delay: 240ms; }
+.subcategory-strip__card:nth-child(4) { animation-delay: 360ms; }
+.subcategory-strip__card:nth-child(5) { animation-delay: 480ms; }
+.subcategory-strip__card--shop-all { animation-delay: 600ms; }
 
 /* Mirror alternate tiles so the row reads as a repeating leaf motif. */
 .subcategory-strip__card:nth-child(even) {
@@ -833,6 +854,17 @@ body {
   width: min(16rem, 60%);
   margin: 0 auto clamp(1.25rem, 2.8vw, 2.25rem);
   border-radius: 0.4rem;
+}
+
+@keyframes subcategory-strip-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (min-width: 640px) {
