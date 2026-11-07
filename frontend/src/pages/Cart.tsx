@@ -10,7 +10,7 @@ import { formatBDT } from '../utils/currency'
  * Every figure shown here (unit price, line total, subtotal, availability)
  * comes from the backend cart response; the page only renders it and sends
  * variant/quantity intent back to the API.
- * ──────────────────────────────────────────────────────────────────────── */
+ * ──────────────────────────────────────────────────────────────────────────── */
 
 function maxSelectable(item: CartItem): number {
   const stockCap = item.available_quantity > 0 ? item.available_quantity : MAX_QUANTITY_PER_ITEM
@@ -132,24 +132,24 @@ export function Cart() {
   if (isLoading) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-10">
-        <p className="text-sm text-stone-600">Loading your bag…</p>
+        <p className="text-sm text-stone-600">Loading your cart…</p>
       </div>
     )
   }
 
   // A load failure leaves no usable cart state: offer a retry instead of an
-  // empty-bag screen that would misrepresent the shopper's bag.
+  // empty-cart screen that would misrepresent the shopper's cart.
   if (error && items.length === 0) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-10">
-        <h1 className="text-3xl font-semibold tracking-tight">Your bag</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Your Cart</h1>
         <p className="mt-4 text-sm text-red-600">{error}</p>
         <button
           type="button"
           onClick={() => void refresh()}
           className="mt-6 rounded-md border border-stone-900 px-5 py-2.5 text-sm font-medium transition-colors hover:bg-stone-900 hover:text-white"
         >
-          Try again
+          View Cart
         </button>
       </div>
     )
@@ -158,9 +158,9 @@ export function Cart() {
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-10">
-        <h1 className="text-3xl font-semibold tracking-tight">Your bag</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Your Cart</h1>
         <div className="mt-10 rounded-lg border border-dashed border-stone-300 px-6 py-16 text-center">
-          <p className="text-sm text-stone-600">Your bag is empty.</p>
+          <p className="text-sm text-stone-600">Your cart is empty.</p>
           <Link
             to="/shop"
             className="mt-6 inline-flex rounded-md bg-stone-900 px-6 py-3 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-stone-700"
@@ -176,7 +176,7 @@ export function Cart() {
     <div className="mx-auto max-w-7xl px-4 py-10">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Your bag</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Your Cart</h1>
           <p className="mt-2 text-sm text-stone-600">
             {totalQuantity} {totalQuantity === 1 ? 'item' : 'items'}
           </p>
@@ -184,7 +184,7 @@ export function Cart() {
         <button
           type="button"
           onClick={() => {
-            if (window.confirm('Remove every item from your bag?')) void clear()
+            if (window.confirm('Remove every item from your cart?')) void clear()
           }}
           disabled={isMutating}
           className="text-xs text-stone-500 underline-offset-4 transition-colors hover:text-stone-900 hover:underline disabled:cursor-not-allowed disabled:text-stone-300"
@@ -214,7 +214,7 @@ export function Cart() {
           role="status"
           className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
         >
-          Some items in your bag exceed the stock currently available. Adjust the
+          Some items in your cart exceed the stock currently available. Adjust the
           quantities below to continue.
         </div>
       )}
@@ -228,6 +228,7 @@ export function Cart() {
 
         <aside className="h-fit rounded-lg border border-stone-200 p-6">
           <h2 className="text-sm font-medium uppercase tracking-widest">Order summary</h2>
+          <p className="mt-1 text-xs text-stone-500">Review what you want to buy.</p>
           <dl className="mt-5 space-y-3 text-sm">
             <div className="flex justify-between">
               <dt className="text-stone-600">Subtotal</dt>

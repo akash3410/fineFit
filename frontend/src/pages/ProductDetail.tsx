@@ -46,8 +46,6 @@ export function ProductDetail() {
   if (error || !product) return <div className="mx-auto max-w-7xl px-4 py-10 text-sm text-red-600">{error || 'Product not found'}</div>
 
   const images = product.images || []
-  // Show the flagged primary image in the hero slot (list views use
-  // ``primary_image``); fall back to the first image when none is flagged.
   const hero = images.find((img) => img.is_primary) ?? images[0]
   const variants = (product.variants || []).filter((v) => v.is_active)
   const activeVariant = variants.find((v) => v.id === selectedVariant)
@@ -69,7 +67,7 @@ export function ProductDetail() {
       result.ok
         ? {
             type: 'success',
-            message: `${quantity} × ${[activeVariant.size, activeVariant.color_name].filter(Boolean).join(' / ') || activeVariant.sku} added to your bag.`,
+            message: `${quantity} × ${[activeVariant.size, activeVariant.color_name].filter(Boolean).join(' / ') || activeVariant.sku} added to your cart.`,
           }
         : { type: 'error', message: result.error },
     )
@@ -144,6 +142,18 @@ export function ProductDetail() {
               >
                 {isMutating ? 'Adding…' : soldOut ? 'Sold out' : 'Add to cart'}
               </button>
+              <Link
+                to="/cart"
+                className="min-w-[220px] rounded-md border border-stone-900 px-6 py-3 text-xs font-medium uppercase tracking-widest text-stone-900 transition-colors hover:bg-stone-100"
+              >
+                Order now
+              </Link>
+              <Link
+                to="/cart"
+                className="min-w-[220px] rounded-md border border-stone-900 px-6 py-3 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-stone-700"
+              >
+                View Cart
+              </Link>
             </div>
           )}
 
@@ -159,7 +169,7 @@ export function ProductDetail() {
               {feedback.message}
               {feedback.type === 'success' && (
                 <Link to="/cart" className="ml-2 font-medium underline underline-offset-4">
-                  View bag
+                  View Cart
                 </Link>
               )}
             </div>
