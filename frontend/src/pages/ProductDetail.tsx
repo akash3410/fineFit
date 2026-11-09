@@ -29,6 +29,7 @@ export function ProductDetail() {
 
   const intent = searchParams.get('intent')
   const buyIntentHandled = useRef(false)
+  const cartIntentHandled = useRef(false)
 
   useEffect(() => {
     async function load() {
@@ -72,16 +73,37 @@ export function ProductDetail() {
     }
   }, [activeVariant, quantity, addItem, navigate])
 
+  const handleAddToCart = useCallback(async () => {
+    if (!activeVariant) return
+    setFeedback(null)
+    const result = await addItem(activeVariant.id, quantity)
+    if (result.ok) {
+      setFeedback({
+        type: 'success',
+        message: `${quantity} × ${[activeVariant.size, activeVariant.color_name].filter(Boolean).join(' / ') || activeVariant.sku} added to your cart.`,
+      })
+    } else {
+      setFeedback({ type: 'error', message: result.error })
+    }
+  }, [activeVariant, quantity, addItem])
+
   useEffect(() => {
     if (intent === 'buy' && product && selectedVariant && !isMutating && !buyIntentHandled.current) {
       buyIntentHandled.current = true
       void handleBuyNow()
     }
+    if (intent === 'cart' && product && selectedVariant && !isMutating && !cartIntentHandled.current) {
+      cartIntentHandled.current = true
+      void handleAddToCart()
+    }
     // Reset when intent changes
     if (intent !== 'buy') {
       buyIntentHandled.current = false
     }
-  }, [intent, product, selectedVariant, isMutating, handleBuyNow])
+    if (intent !== 'cart') {
+      cartIntentHandled.current = false
+    }
+  }, [intent, product, selectedVariant, isMutating, handleBuyNow, handleAddToCart])
 
   if (loading) return <div className="mx-auto max-w-7xl px-4 py-10 text-sm text-stone-600">Loading...</div>
   if (error || !product) return <div className="mx-auto max-w-7xl px-4 py-10 text-sm text-red-600">{error || 'Product not found'}</div>
