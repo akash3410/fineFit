@@ -1,9 +1,11 @@
 import { normalizeImageUrl } from '../utils/image'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { getCategories, getProducts } from '../api/catalog'
+import { getCategories, getProducts, getProduct } from '../api/catalog'
 import type { Category, ProductListItem } from '../types/catalog'
 import { formatBDT } from '../utils/currency'
+import { useCart } from '../features/cart/CartContext'
+import { useToast } from '../features/toast/ToastContext'
 
 export function Shop() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -11,6 +13,9 @@ export function Shop() {
   const [products, setProducts] = useState<ProductListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { addItem, isMutating } = useCart()
+  const { showToast } = useToast()
+  const [addingToCart, setAddingToCart] = useState<Set<number>>(new Set())
 
   const category = searchParams.get('category') || ''
   const subcategory = searchParams.get('subcategory') || ''
@@ -40,6 +45,39 @@ export function Shop() {
     if (value) params.set(key, value)
     else params.delete(key)
     setSearchParams(params)
+  }
+
+  const handleAddToCart = async (product: ProductListItem) => {
+    if (addingToCart.has(product.id)) return
+    const newAdding = new Set(addingToCart)
+    newAdding.add(product.id)
+    setAddingToCart(newAdding)
+
+    try {
+      const detail = await getProduct(product.slug)
+      const variant = (detail.variants || []).find((v) => v.is_active)
+      if (!variant) {
+        showToast('This product has no available options', 'error')
+        return
+      }
+      const result = await addItem(variant.id, 1)
+      if (result.ok) {
+        showToast(`${product.title} added to cart`, 'success')
+      } else {
+        showToast(result.error, 'error')
+      }
+    } catch {
+      showToast('Failed to add to cart', 'error')
+    } finally {
+      const newAdding = new Set(addingToCart)
+      newAdding.delete(product.id)
+      setAddingToCart(newAdding)
+    }
+  }
+
+  const handleOrderNow = (product: ProductListItem) => {
+    // Order now still navigates to product page with intent=buy
+    window.location.href = `/product/${product.slug}?intent=buy`
   }
 
   return (
@@ -77,26 +115,31 @@ export function Shop() {
                 const img = product.primary_image?.image
                 const inStock = (product.stock ?? 0) > 0
                 const detailPath = `/product/${product.slug}`
+                const isAdding = addingToCart.has(product.id)
                 return (
                   <article key={product.id} className="group">
                     <Link to={detailPath} className="block" aria-label={`View ${product.title} details`}>
                       <div className="aspect-[4/5] w-full overflow-hidden rounded-lg bg-stone-100 relative">
                         {img ? <img src={normalizeImageUrl(img) ?? undefined} alt={product.primary_image?.alt_text||product.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-sm text-stone-400">No image</div>}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3 gap-2">
-                          <Link
-                            to={`${detailPath}?intent=cart`}
-                            className="flex-1 text-center rounded-md bg-white/90 backdrop-blur-sm px-3 py-2 text-xs font-medium uppercase tracking-widest text-stone-900 transition-colors hover:bg-white"
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(product)}
+                            disabled={isAdding || isMutating || !inStock}
+                            className="flex-1 text-center rounded-md bg-white/90 backdrop-blur-sm px-3 py-2 text-xs font-medium uppercase tracking-widest text-stone-900 transition-colors hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label={inStock ? `Add ${product.title} to cart` : `View ${product.title} options`}
                           >
-                            {inStock ? 'Add to cart' : 'View options'}
-                          </Link>
-                          <Link
-                            to={`${detailPath}?intent=buy`}
-                            className="flex-1 text-center rounded-md border border-white/30 bg-transparent px-3 py-2 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-white/10"
+                            {isAdding ? 'Adding…' : inStock ? 'Add to cart' : 'View options'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOrderNow(product)}
+                            disabled={isMutating}
+                            className="flex-1 text-center rounded-md border border-white/30 bg-transparent px-3 py-2 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label={`Order ${product.title} now`}
                           >
                             Order now
-                          </Link>
+                          </button>
                         </div>
                       </div>
                     </Link>

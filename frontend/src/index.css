@@ -89,6 +89,22 @@ body {
   opacity: 0;
 }
 
+/* Toast slide-in animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * Brand Promise Strip — premium animated promise marquee (replaces the former
  * "Journey of Trust" 3-D coverflow). Compact cards, glassmorphism surface,

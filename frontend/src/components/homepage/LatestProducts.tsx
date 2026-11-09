@@ -19,9 +19,11 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { getProducts } from "../../api/catalog";
+import { getProducts, getProduct } from "../../api/catalog";
 import type { PaginatedResponse, ProductListItem } from "../../types/catalog";
 import { formatBDT } from "../../utils/currency";
+import { useCart } from "../../features/cart/CartContext";
+import { useToast } from "../../features/toast/ToastContext";
 
 const PAGE_SIZE = 8;
 const NEW_PRODUCT_DAYS = 30;
@@ -91,6 +93,9 @@ export function LatestProducts({ className }: LatestProductsProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [revealed, setRevealed] = useState(() => typeof IntersectionObserver === "undefined");
   const sectionRef = useRef<HTMLElement | null>(null);
+  const { addItem, isMutating } = useCart()
+  const { showToast } = useToast()
+  const [addingToCart, setAddingToCart] = useState<Set<number>>(new Set())
 
   /* ── Data ── */
   useEffect(() => {
@@ -152,6 +157,38 @@ export function LatestProducts({ className }: LatestProductsProps) {
   const sectionClass = ["latest-products", revealed ? "latest-products--visible" : "", className]
     .filter(Boolean)
     .join(" ");
+
+  const handleAddToCart = async (product: ProductListItem) => {
+    if (addingToCart.has(product.id)) return
+    const newAdding = new Set(addingToCart)
+    newAdding.add(product.id)
+    setAddingToCart(newAdding)
+
+    try {
+      const detail = await getProduct(product.slug)
+      const variant = (detail.variants || []).find((v) => v.is_active)
+      if (!variant) {
+        showToast('This product has no available options', 'error')
+        return
+      }
+      const result = await addItem(variant.id, 1)
+      if (result.ok) {
+        showToast(`${product.title} added to cart`, 'success')
+      } else {
+        showToast(result.error, 'error')
+      }
+    } catch {
+      showToast('Failed to add to cart', 'error')
+    } finally {
+      const newAdding = new Set(addingToCart)
+      newAdding.delete(product.id)
+      setAddingToCart(newAdding)
+    }
+  }
+
+  const handleOrderNow = (product: ProductListItem) => {
+    window.location.href = `/product/${product.slug}?intent=buy`
+  }
 
   return (
     <section className={sectionClass} ref={sectionRef} aria-labelledby="latest-products-title">
@@ -273,18 +310,24 @@ export function LatestProducts({ className }: LatestProductsProps) {
                     </Link>
 
                     <div className="latest-products__actions">
-                      <Link
-                        to={`${detailPath}?intent=cart`}
+                      <button
+                        type="button"
+                        onClick={() => handleAddToCart(product)}
+                        disabled={addingToCart.has(product.id) || isMutating || !inStock}
                         className="latest-products__action latest-products__action--primary"
+                        aria-label={inStock ? `Add ${product.title} to cart` : `View ${product.title} options`}
                       >
-                        {inStock ? "Add to cart" : "View options"}
-                      </Link>
-                      <Link
-                        to={`${detailPath}?intent=buy`}
+                        {addingToCart.has(product.id) ? 'Adding…' : inStock ? 'Add to cart' : 'View options'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOrderNow(product)}
+                        disabled={isMutating}
                         className="latest-products__action latest-products__action--ghost"
+                        aria-label={`Order ${product.title} now`}
                       >
                         Order now
-                      </Link>
+                      </button>
                     </div>
                   </div>
 
