@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getProduct } from '../api/catalog'
 import { MAX_QUANTITY_PER_ITEM } from '../api/cart'
@@ -28,6 +28,7 @@ export function ProductDetail() {
   >(null)
 
   const intent = searchParams.get('intent')
+  const buyIntentHandled = useRef(false)
 
   useEffect(() => {
     async function load() {
@@ -72,8 +73,13 @@ export function ProductDetail() {
   }, [activeVariant, quantity, addItem, navigate])
 
   useEffect(() => {
-    if (intent === 'buy' && product && selectedVariant && !isMutating) {
+    if (intent === 'buy' && product && selectedVariant && !isMutating && !buyIntentHandled.current) {
+      buyIntentHandled.current = true
       void handleBuyNow()
+    }
+    // Reset when intent changes
+    if (intent !== 'buy') {
+      buyIntentHandled.current = false
     }
   }, [intent, product, selectedVariant, isMutating, handleBuyNow])
 
