@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getProduct } from '../api/catalog'
 import { MAX_QUANTITY_PER_ITEM } from '../api/cart'
 import { useCart } from '../features/cart/CartContext'
@@ -15,6 +15,8 @@ const STOCK_LABELS: Record<string, string> = {
 
 export function ProductDetail() {
   const { slug } = useParams<{ slug: string }>()
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { addItem, isMutating } = useCart()
   const [product, setProduct] = useState<ProductDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -24,6 +26,8 @@ export function ProductDetail() {
   const [feedback, setFeedback] = useState<
     { type: 'success'; message: string } | { type: 'error'; message: string } | null
   >(null)
+
+  const intent = searchParams.get('intent')
 
   useEffect(() => {
     async function load() {
@@ -42,14 +46,11 @@ export function ProductDetail() {
     load()
   }, [slug])
 
-  if (loading) return <div className="mx-auto max-w-7xl px-4 py-10 text-sm text-stone-600">Loading...</div>
-  if (error || !product) return <div className="mx-auto max-w-7xl px-4 py-10 text-sm text-red-600">{error || 'Product not found'}</div>
-
-  const images = product.images || []
+  const images = product?.images || []
   const hero = images.find((img) => img.is_primary) ?? images[0]
-  const variants = (product.variants || []).filter((v) => v.is_active)
+  const variants = (product?.variants || []).filter((v) => v.is_active)
   const activeVariant = variants.find((v) => v.id === selectedVariant)
-  const price = activeVariant?.effective_price || product.base_price
+  const price = activeVariant?.effective_price || product?.base_price
   const soldOut = activeVariant?.is_in_stock === false
   const canAddToCart = Boolean(activeVariant) && !soldOut && !isMutating
 
@@ -59,19 +60,25 @@ export function ProductDetail() {
     setFeedback(null)
   }
 
-  const handleAddToCart = async () => {
+  const handleBuyNow = useCallback(async () => {
     if (!activeVariant) return
     setFeedback(null)
     const result = await addItem(activeVariant.id, quantity)
-    setFeedback(
-      result.ok
-        ? {
-            type: 'success',
-            message: `${quantity} × ${[activeVariant.size, activeVariant.color_name].filter(Boolean).join(' / ') || activeVariant.sku} added to your cart.`,
-          }
-        : { type: 'error', message: result.error },
-    )
-  }
+    if (result.ok) {
+      navigate('/cart')
+    } else {
+      setFeedback({ type: 'error', message: result.error })
+    }
+  }, [activeVariant, quantity, addItem, navigate])
+
+  useEffect(() => {
+    if (intent === 'buy' && product && selectedVariant && !isMutating) {
+      void handleBuyNow()
+    }
+  }, [intent, product, selectedVariant, isMutating, handleBuyNow])
+
+  if (loading) return <div className="mx-auto max-w-7xl px-4 py-10 text-sm text-stone-600">Loading...</div>
+  if (error || !product) return <div className="mx-auto max-w-7xl px-4 py-10 text-sm text-red-600">{error || 'Product not found'}</div>
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
@@ -136,21 +143,15 @@ export function ProductDetail() {
               </div>
               <button
                 type="button"
-                onClick={() => void handleAddToCart()}
+                onClick={handleBuyNow}
                 disabled={!canAddToCart}
                 className="min-w-[220px] rounded-md bg-stone-900 px-6 py-3 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-300"
               >
-                {isMutating ? 'Adding…' : soldOut ? 'Sold out' : 'Add to cart'}
+                {isMutating ? 'Adding…' : soldOut ? 'Sold out' : 'Order now'}
               </button>
               <Link
                 to="/cart"
                 className="min-w-[220px] rounded-md border border-stone-900 px-6 py-3 text-xs font-medium uppercase tracking-widest text-stone-900 transition-colors hover:bg-stone-100"
-              >
-                Order now
-              </Link>
-              <Link
-                to="/cart"
-                className="min-w-[220px] rounded-md border border-stone-900 px-6 py-3 text-xs font-medium uppercase tracking-widest text-white transition-colors hover:bg-stone-700"
               >
                 View Cart
               </Link>
